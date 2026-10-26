@@ -1,0 +1,17 @@
+[package]
+name = "rustytm"
+version = "0.1.0"
+edition = "2021"
+description = "Task manager for Linux in Rust: processes, performance, sensors, connections, drivers, disk space, benchmarks, flight recorder"
+license = "MIT"
+
+[dependencies]
+ratatui = "0.29"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+ureq = "2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
