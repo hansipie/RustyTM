@@ -36,13 +36,18 @@ Or from source:
     ./target/release/rustytm --bench=cpu|disk|gpu|internet|all
 
 Pages: Summary, Processes (tree, signals, nice, affinity, details), Performance (CPU/memory/disks/
-network/GPU), App history, Startup apps, Users, Services, System Info (export), Power & Freq,
-Flight Recorder (record, save, validate, replay), Connections, Installed Apps, Drivers (kernel
-modules), Disk Space (scanner), Benchmarks (CPU, disk, GPU, internet), Settings. Press `?` for keys.
+network/GPU), App history, Startup apps, Users, Services, System Info (export; memory and Wi-Fi details), Power & Freq,
+Flight Recorder (record, save, validate, replay), Connections, Installed Apps (uninstall with `u`), Drivers (kernel
+modules), Disk Space (scanner), Benchmarks (CPU, disk, GPU, internet), Disk Health (SMART), Settings. Press `?` for keys.
 
 The GPU benchmark (FP32 compute and memory copy bandwidth) uses OpenCL, loaded at run time with
 `dlopen`: nothing to link at build time, and without an OpenCL driver (vendor driver or Mesa
 rusticl) the test just reports that no GPU was found.
+
+Optional tools: `smartctl` (smartmontools) for Disk Health, `iw` and `nmcli` for Wi-Fi details,
+`dmidecode` for memory modules. SMART and `dmidecode` usually need root (run with `sudo`, or allow
+passwordless `sudo smartctl`/`dmidecode`). Uninstalling supports flatpak, snap, dnf, rpm-ostree,
+apt and rpm, asks for confirmation and escalates with `pkexec` when needed.
 
 Not implemented: video (WebM) recording, tray gadgets / pop-out / screensaver /
 global shortcut (these need a GUI toolkit), localisation.
