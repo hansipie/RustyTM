@@ -14,7 +14,6 @@ pub struct Proc {
     pub user: String,
     pub cpu: f32,
     pub rss: u64,
-    pub virt: u64,
     pub threads: u32,
     pub nice: i32,
     pub read_bytes: u64,
@@ -22,7 +21,6 @@ pub struct Proc {
     pub read_rate: f64,
     pub write_rate: f64,
     pub cpu_ticks: u64,
-    pub start_ticks: u64,
 }
 
 impl Proc {
@@ -154,7 +152,6 @@ impl ProcSampler {
                     user: self.users.get(&uid).cloned().unwrap_or_else(|| uid.to_string()),
                     cpu,
                     rss: f[21].parse::<u64>().unwrap_or(0) * self.page,
-                    virt: f[20].parse().unwrap_or(0),
                     threads: f[17].parse().unwrap_or(1),
                     nice: f[16].parse().unwrap_or(0),
                     read_bytes: rb,
@@ -162,7 +159,6 @@ impl ProcSampler {
                     read_rate: rr,
                     write_rate: wr,
                     cpu_ticks: ticks,
-                    start_ticks: f[19].parse().unwrap_or(0),
                 });
             }
         }

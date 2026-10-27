@@ -543,10 +543,8 @@ pub fn set_startup_enabled(s: &Startup, enable: bool) -> Result<(), String> {
 pub struct Session {
     pub id: String,
     pub uid: u32,
-    pub user: String,
     pub seat: String,
     pub tty: String,
-    pub class: String,
 }
 
 pub fn sessions() -> Vec<Session> {
@@ -555,7 +553,7 @@ pub fn sessions() -> Vec<Session> {
         for l in t.lines() {
             let f: Vec<&str> = l.split_whitespace().collect();
             if f.len() >= 3 {
-                out.push(Session { id: f[0].into(), uid: f[1].parse().unwrap_or(0), user: f[2].into(), seat: f.get(3).unwrap_or(&"").to_string(), tty: f.get(4).unwrap_or(&"").to_string(), class: String::new() });
+                out.push(Session { id: f[0].into(), uid: f[1].parse().unwrap_or(0), seat: f.get(3).unwrap_or(&"").to_string(), tty: f.get(4).unwrap_or(&"").to_string() });
             }
         }
     }
@@ -595,7 +593,6 @@ fn cmd_result(cmd: &str, args: &[&str], fail: &str) -> Result<(), String> {
 #[derive(Clone, Debug)]
 pub struct Service {
     pub unit: String,
-    pub load: String,
     pub active: String,
     pub sub: String,
     pub description: String,
@@ -611,9 +608,9 @@ pub fn services() -> Vec<Service> {
     if let Some(t) = run("systemctl", &["list-units", "--type=service", "--all", "--no-legend", "--no-pager", "--plain"]) {
         for l in t.lines() {
             let mut it = l.split_whitespace();
-            let (Some(unit), Some(load), Some(active), Some(sub)) = (it.next(), it.next(), it.next(), it.next()) else { continue };
+            let (Some(unit), Some(_load), Some(active), Some(sub)) = (it.next(), it.next(), it.next(), it.next()) else { continue };
             let desc: Vec<&str> = it.collect();
-            out.push(Service { unit: unit.into(), load: load.into(), active: active.into(), sub: sub.into(), description: desc.join(" "), enabled: enabled.get(unit).cloned().unwrap_or_else(|| "-".into()), pid: None });
+            out.push(Service { unit: unit.into(), active: active.into(), sub: sub.into(), description: desc.join(" "), enabled: enabled.get(unit).cloned().unwrap_or_else(|| "-".into()), pid: None });
         }
     }
     // MainPID for active units, one systemctl call

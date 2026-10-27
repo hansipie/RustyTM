@@ -154,10 +154,6 @@ pub fn cpu_freqs(n: usize) -> Vec<f64> {
     v
 }
 
-pub fn cpu_max_mhz() -> Option<f64> {
-    read_f64("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq").map(|k| k / 1000.0)
-}
-
 // ───────────────────────────── Memory ─────────────────────────────
 
 #[derive(Default, Clone)]
@@ -320,7 +316,6 @@ impl DiskSampler {
 pub struct MountUse {
     pub mount: String,
     pub fstype: String,
-    pub source: String,
     pub total: u64,
     pub free: u64,
 }
@@ -347,7 +342,7 @@ pub fn mounts() -> Vec<MountUse> {
             continue;
         }
         let bs = st.f_frsize as u64;
-        out.push(MountUse { mount, fstype: f[2].into(), source: f[0].into(), total: st.f_blocks as u64 * bs, free: st.f_bavail as u64 * bs });
+        out.push(MountUse { mount, fstype: f[2].into(), total: st.f_blocks as u64 * bs, free: st.f_bavail as u64 * bs });
     }
     out
 }
