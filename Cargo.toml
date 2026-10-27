@@ -4,6 +4,12 @@ version = "1.1.0"
 edition = "2021"
 description = "Task manager for Linux in Rust: processes, performance, sensors, connections, drivers, disk space, benchmarks, flight recorder"
 license = "MIT"
+repository = "https://github.com/hansipie/RustyTM"
+homepage = "https://github.com/hansipie/RustyTM"
+readme = "README.md"
+keywords = ["task-manager", "tui", "linux", "system-monitor", "benchmark"]
+categories = ["command-line-utilities", "visualization"]
+include = ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE*"]
 
 [dependencies]
 ratatui = "0.29"

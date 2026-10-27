@@ -5,6 +5,7 @@ mod diskscan;
 mod draw;
 mod recorder;
 mod settings;
+mod update;
 mod util;
 
 use app::*;
@@ -16,6 +17,7 @@ use std::time::Duration;
 const HELP: &str = "RustyTM — task manager for Linux
 
 USAGE: rustytm [OPTIONS]
+       rustytm update       check crates.io and reinstall the latest version (via cargo)
 
   --page=<name>        open on a page (summary, processes, performance, app-history, startup,
                        users, services, system-info, power-freq, flight-recorder, connections,
@@ -50,6 +52,9 @@ fn load_settings() -> settings::Settings {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("update") {
+        std::process::exit(update::run());
+    }
     if has(&args, "--help") || has(&args, "-h") {
         print!("{HELP}");
         return;
