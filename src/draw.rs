@@ -126,7 +126,7 @@ fn hints(a: &App) -> &'static str {
         P_APPS => "p packages without desktop entries  r reload  / filter",
         P_DRIVERS => "Enter details  l loaded only  r reload  / filter",
         P_DISK => "Enter scan mount  c choose folder  Space pause  x stop  v view",
-        P_BENCH => "a all  c cpu  d disk  i internet  f folder  C clear  Esc cancel",
+        P_BENCH => "a all  c cpu  d disk  g gpu  i internet  f folder  C clear  Esc cancel",
         P_SETTINGS => "Enter/Space change",
         P_APPHIST => "C clear  / filter",
         _ => "Tab/←→ pages  ? help  q quit",
@@ -853,7 +853,7 @@ fn fmt_res(v: Option<f64>, unit: &str) -> String {
 
 fn benchmarks(f: &mut Frame, area: Rect, a: &mut App) {
     let s = a.bench.snapshot();
-    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Length(12), Constraint::Min(4)]).split(area);
+    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Length(13), Constraint::Min(4)]).split(area);
     f.render_widget(
         Gauge::default().block(block(format!("Benchmark progress — {}", if s.label.is_empty() { "Ready" } else { &s.label }), a)).ratio(s.progress.clamp(0.0, 1.0) as f64).gauge_style(Style::new().fg(accent(a))),
         v[0],
@@ -867,7 +867,8 @@ fn benchmarks(f: &mut Frame, area: Rect, a: &mut App) {
         line("Disk write", fmt_res(r.disk_write_mbs, "MB/sec")),
         line("Internet download", fmt_res(r.net_down_mbps, "Mb/s")),
         line("Internet upload", fmt_res(r.net_up_mbps, "Mb/s")),
-        line("GPU graphics / compute", "not available in this build".into()),
+        line("GPU compute (FP32)", if r.gpu_device.is_empty() { fmt_res(r.gpu_gflops, "GFLOPS") } else { format!("{} — {}", fmt_res(r.gpu_gflops, "GFLOPS"), r.gpu_device) }),
+        line("GPU memory copy", fmt_res(r.gpu_mem_gbs, "GB/sec")),
         line("Test folder", a.bench_dir.to_string_lossy().into_owned()),
     ];
     for e in &s.errors {
@@ -879,10 +880,10 @@ fn benchmarks(f: &mut Frame, area: Rect, a: &mut App) {
         .bench_hist
         .iter()
         .rev()
-        .map(|h| vec![fmt_time(h.at), h.score.map(|x| format!("{x:.0}")).unwrap_or_default(), fmt_res(h.cpu_single_mops, "M"), fmt_res(h.cpu_multi_gops, "G"), fmt_res(h.disk_read_mbs, "MB"), fmt_res(h.disk_write_mbs, "MB"), fmt_res(h.net_down_mbps, "Mb")])
+        .map(|h| vec![fmt_time(h.at), h.score.map(|x| format!("{x:.0}")).unwrap_or_default(), fmt_res(h.cpu_single_mops, "M"), fmt_res(h.cpu_multi_gops, "G"), fmt_res(h.disk_read_mbs, "MB"), fmt_res(h.disk_write_mbs, "MB"), fmt_res(h.gpu_gflops, "GF"), fmt_res(h.net_down_mbps, "Mb")])
         .collect();
     let mut off = 0;
-    table(f, v[2], "Benchmark history".into(), &["When", "Score", "1 core", "All cores", "Disk read", "Disk write", "Download"], &[Constraint::Length(17), Constraint::Length(6), Constraint::Length(14), Constraint::Length(12), Constraint::Length(14), Constraint::Length(14), Constraint::Length(14)], rows, usize::MAX / 2, &mut off, a);
+    table(f, v[2], "Benchmark history".into(), &["When", "Score", "1 core", "All cores", "Disk read", "Disk write", "GPU", "Download"], &[Constraint::Length(17), Constraint::Length(6), Constraint::Length(14), Constraint::Length(12), Constraint::Length(14), Constraint::Length(14), Constraint::Length(12), Constraint::Length(14)], rows, usize::MAX / 2, &mut off, a);
 }
 
 pub fn fmt_time(secs: u64) -> String {
@@ -959,7 +960,7 @@ fn overlays(f: &mut Frame, area: Rect, a: &App) {
         f.render_widget(Paragraph::new(vec![Line::from(text), Line::from(""), Line::from("y / Enter = yes     any other key = no")]).wrap(Wrap { trim: true }).block(block("Confirm", a)), r);
     }
     if a.help {
-        let text = "Pages:   Tab / Shift-Tab / [ ] / ← →\nQuit:    q or Ctrl-C        Filter: /  (Esc clears)\nSidebar: b                   Status bar: B\nRun new task: N              Help: ?\n\nProcesses:  ↑↓ PgUp PgDn  Enter details  x terminate (SIGTERM)  K kill (SIGKILL)\n            X terminate/force the whole tree (x then X)  p suspend  c continue\n            s send signal  n nice  a affinity  t tree  Space fold  E fold all\n            e show exited  v values/percent  < > sort column  o order  C copy cmdline\n            Y copy name  W search online  m write a sample report\n\nEvery page ships complete: Pro-only pages of the original (Benchmarks, Connections,\nDisk Space, Drivers, Flight Recorder, Installed Apps, Power & Freq) are all enabled.";
+        let text = "Pages:   Tab / Shift-Tab / [ ] / ← →\nQuit:    q or Ctrl-C        Filter: /  (Esc clears)\nSidebar: b                   Status bar: B\nRun new task: N              Help: ?\n\nProcesses:  ↑↓ PgUp PgDn  Enter details  x terminate (SIGTERM)  K kill (SIGKILL)\n            X terminate/force the whole tree (x then X)  p suspend  c continue\n            s send signal  n nice  a affinity  t tree  Space fold  E fold all\n            e show exited  v values/percent  < > sort column  o order  C copy cmdline\n            Y copy name  W search online  m write a sample report\n\nFlight Recorder:  r record  s save  d discard  Enter replay  Space play/pause  ,/. step\n                  PgUp/PgDn ±30 samples  x close replay\n\nDisk space:  Enter measure selected disk  c choose folder to measure\n\nBenchmarks:  a all  c cpu  d disk  g gpu  i internet  f folder  C clear history";
         let r = centered(area, 86, 18);
         f.render_widget(Clear, r);
         f.render_widget(Paragraph::new(text).block(block("Help — press any key", a)), r);

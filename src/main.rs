@@ -25,7 +25,7 @@ USAGE: rustytm [OPTIONS]
   --self-test          collect everything once, render every page headlessly, print a report
   --record[=SECS]      headless Flight Recorder: sample once a second (default 10 s) and save a trace
   --replay=<file>      validate a .rustytmtrace file and print its summary
-  --bench=<kind>       run a benchmark without UI: cpu | disk | internet | all
+  --bench=<kind>       run a benchmark without UI: cpu | disk | gpu | internet | all
   --reset-settings     delete the settings file
   --version, --help
 ";
@@ -268,10 +268,11 @@ fn headless_bench(kind: &str) {
     let k = match kind {
         "cpu" => bench::Kind::Cpu,
         "disk" => bench::Kind::Disk,
+        "gpu" => bench::Kind::Gpu,
         "internet" => bench::Kind::Internet,
         "all" => bench::Kind::All,
         _ => {
-            eprintln!("unknown benchmark '{kind}' (cpu | disk | internet | all)");
+            eprintln!("unknown benchmark '{kind}' (cpu | disk | gpu | internet | all)");
             std::process::exit(2);
         }
     };
@@ -289,6 +290,8 @@ fn headless_bench(kind: &str) {
             println!("cpu multi   {}", f(r.cpu_multi_gops, "Gop/sec"));
             println!("disk read   {}", f(r.disk_read_mbs, "MB/sec"));
             println!("disk write  {}", f(r.disk_write_mbs, "MB/sec"));
+            println!("gpu compute {}{}", f(r.gpu_gflops, "GFLOPS"), if r.gpu_device.is_empty() { String::new() } else { format!(" ({})", r.gpu_device) });
+            println!("gpu memory  {}", f(r.gpu_mem_gbs, "GB/sec"));
             println!("download    {}", f(r.net_down_mbps, "Mb/s"));
             println!("upload      {}", f(r.net_up_mbps, "Mb/s"));
             println!("score       {}", r.score.map(|x| format!("{x:.0}")).unwrap_or_else(|| "-".into()));

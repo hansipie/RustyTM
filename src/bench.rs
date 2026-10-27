@@ -9,12 +9,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+mod gpu;
+
 // Reference figures the score is baselined to (score 100). They are this tool's own
 // yardstick: scores are comparable between runs of this program only.
 const REF_SINGLE_MOPS: f64 = 900.0;
 const REF_MULTI_GOPS: f64 = 6.0;
 const REF_DISK_READ_MBS: f64 = 1500.0;
 const REF_DISK_WRITE_MBS: f64 = 1200.0;
+const REF_GPU_GFLOPS: f64 = 5000.0;
+const REF_GPU_MEM_GBS: f64 = 200.0;
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct BenchResult {
@@ -24,6 +28,10 @@ pub struct BenchResult {
     pub disk_write_mbs: Option<f64>,
     pub net_down_mbps: Option<f64>,
     pub net_up_mbps: Option<f64>,
+    pub gpu_gflops: Option<f64>,
+    pub gpu_mem_gbs: Option<f64>,
+    #[serde(default)]
+    pub gpu_device: String,
     pub score: Option<f64>,
     pub at: u64,
     pub note: String,
@@ -36,6 +44,8 @@ impl BenchResult {
             self.cpu_multi_gops.map(|v| v / REF_MULTI_GOPS),
             self.disk_read_mbs.map(|v| v / REF_DISK_READ_MBS),
             self.disk_write_mbs.map(|v| v / REF_DISK_WRITE_MBS),
+            self.gpu_gflops.map(|v| v / REF_GPU_GFLOPS),
+            self.gpu_mem_gbs.map(|v| v / REF_GPU_MEM_GBS),
         ]
         .into_iter()
         .flatten()
@@ -60,6 +70,7 @@ pub struct BenchState {
 pub enum Kind {
     Cpu,
     Disk,
+    Gpu,
     Internet,
     All,
 }
@@ -255,6 +266,16 @@ impl Bench {
                         r.disk_write_mbs = Some(wr);
                     }
                     Err(e) => err(format!("Disk test failed: {e}")),
+                }
+            }
+            if matches!(kind, Kind::Gpu | Kind::All) && !cancel.load(Ordering::SeqCst) {
+                match gpu::run(3.0, &cancel, &set) {
+                    Ok(g) => {
+                        r.gpu_gflops = Some(g.gflops);
+                        r.gpu_mem_gbs = Some(g.mem_gbs);
+                        r.gpu_device = g.device;
+                    }
+                    Err(e) => err(format!("GPU test failed: {e}")),
                 }
             }
             if matches!(kind, Kind::Internet | Kind::All) && !cancel.load(Ordering::SeqCst) {

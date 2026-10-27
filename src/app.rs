@@ -1277,6 +1277,7 @@ impl App {
             KeyCode::Char('a') => self.bench.start(Kind::All, dir),
             KeyCode::Char('c') => self.bench.start(Kind::Cpu, dir),
             KeyCode::Char('d') => self.bench.start(Kind::Disk, dir),
+            KeyCode::Char('g') => self.bench.start(Kind::Gpu, dir),
             KeyCode::Char('i') => self.bench.start(Kind::Internet, dir),
             KeyCode::Char('f') => self.prompt = Some(Prompt { kind: PromptKind::BenchDir, label: "Choose benchmark folder".into(), buf: self.bench_dir.to_string_lossy().into_owned() }),
             KeyCode::Char('C') => self.confirm = Some(Confirm::ClearHistory),
