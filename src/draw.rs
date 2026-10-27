@@ -126,7 +126,7 @@ fn hints(a: &App) -> &'static str {
         P_APPS => "p packages without desktop entries  r reload  / filter",
         P_DRIVERS => "Enter details  l loaded only  r reload  / filter",
         P_DISK => "Enter scan mount  c choose folder  Space pause  x stop  v view",
-        P_BENCH => "a all  c cpu  d disk  i internet  f folder  h history  C clear  Esc cancel",
+        P_BENCH => "a all  c cpu  d disk  i internet  f folder  C clear  Esc cancel",
         P_SETTINGS => "Enter/Space change",
         P_APPHIST => "C clear  / filter",
         _ => "Tab/←→ pages  ? help  q quit",
@@ -150,13 +150,18 @@ fn status(f: &mut Frame, area: Rect, a: &App) {
 #[allow(clippy::too_many_arguments)]
 pub fn table(f: &mut Frame, area: Rect, title: String, headers: &[&str], widths: &[Constraint], rows: Vec<Vec<String>>, sel: usize, off: &mut usize, a: &App) {
     let h = area.height.saturating_sub(3) as usize;
-    if sel < *off {
-        *off = sel;
-    }
-    if h > 0 && sel >= *off + h {
-        *off = sel + 1 - h;
-    }
     let total = rows.len();
+    // a selection past the end means "no selection": keep the view at the top
+    if sel >= total {
+        *off = 0;
+    } else {
+        if sel < *off {
+            *off = sel;
+        }
+        if h > 0 && sel >= *off + h {
+            *off = sel + 1 - h;
+        }
+    }
     let body: Vec<Row> = rows
         .into_iter()
         .enumerate()
@@ -877,7 +882,7 @@ fn benchmarks(f: &mut Frame, area: Rect, a: &mut App) {
         .map(|h| vec![fmt_time(h.at), h.score.map(|x| format!("{x:.0}")).unwrap_or_default(), fmt_res(h.cpu_single_mops, "M"), fmt_res(h.cpu_multi_gops, "G"), fmt_res(h.disk_read_mbs, "MB"), fmt_res(h.disk_write_mbs, "MB"), fmt_res(h.net_down_mbps, "Mb")])
         .collect();
     let mut off = 0;
-    table(f, v[2], "Benchmark history (h)".into(), &["When", "Score", "1 core", "All cores", "Disk read", "Disk write", "Download"], &[Constraint::Length(17), Constraint::Length(6), Constraint::Length(14), Constraint::Length(12), Constraint::Length(14), Constraint::Length(14), Constraint::Length(14)], rows, usize::MAX / 2, &mut off, a);
+    table(f, v[2], "Benchmark history".into(), &["When", "Score", "1 core", "All cores", "Disk read", "Disk write", "Download"], &[Constraint::Length(17), Constraint::Length(6), Constraint::Length(14), Constraint::Length(12), Constraint::Length(14), Constraint::Length(14), Constraint::Length(14)], rows, usize::MAX / 2, &mut off, a);
 }
 
 pub fn fmt_time(secs: u64) -> String {

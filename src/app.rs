@@ -192,7 +192,7 @@ pub struct App {
     // benchmarks
     pub bench: Bench,
     pub bench_hist: Vec<BenchResult>,
-    pub bench_show_hist: bool,
+    bench_was_running: bool,
     pub bench_dir: PathBuf,
 
     // recorder
@@ -289,7 +289,7 @@ impl App {
             disk_view: 0,
             bench: Bench::new(),
             bench_hist: bench::load_history(),
-            bench_show_hist: false,
+            bench_was_running: false,
             bench_dir,
             rec: None,
             replay: None,
@@ -325,6 +325,12 @@ impl App {
 
     pub fn tick(&mut self) {
         self.last_tick = Instant::now();
+        // the run appends to the history file when it ends
+        let running = self.bench.running();
+        if self.bench_was_running && !running {
+            self.bench_hist = bench::load_history();
+        }
+        self.bench_was_running = running;
         self.cpu = self.cpu_sampler.sample();
         self.freqs = cpu_freqs(self.cpu_static.logical);
         self.mem = mem();
@@ -1273,7 +1279,6 @@ impl App {
             KeyCode::Char('d') => self.bench.start(Kind::Disk, dir),
             KeyCode::Char('i') => self.bench.start(Kind::Internet, dir),
             KeyCode::Char('f') => self.prompt = Some(Prompt { kind: PromptKind::BenchDir, label: "Choose benchmark folder".into(), buf: self.bench_dir.to_string_lossy().into_owned() }),
-            KeyCode::Char('h') => self.bench_show_hist = !self.bench_show_hist,
             KeyCode::Char('C') => self.confirm = Some(Confirm::ClearHistory),
             KeyCode::Esc => self.bench.cancel(),
             _ => {}
