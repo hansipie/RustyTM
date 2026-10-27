@@ -204,6 +204,7 @@ pub struct App {
 
 impl App {
     pub fn new(s: Settings) -> App {
+        crate::util::set_net_bits(s.net_bits);
         let cpu_static = cpu_static();
         let gpus = Arc::new(Mutex::new(crate::collect::system::gpus()));
         {
@@ -939,6 +940,7 @@ impl App {
             Confirm::DiscardTrace => self.rec = None,
             Confirm::ResetSettings => {
                 self.s = Settings::default();
+                crate::util::set_net_bits(false);
                 self.save_settings();
                 self.say("Settings reset.");
             }
@@ -1301,17 +1303,19 @@ impl App {
             5 => s.combined_gpus = !s.combined_gpus,
             6 => s.combined_disks = !s.combined_disks,
             7 => s.combined_network = !s.combined_network,
-            8 => s.status_bar = !s.status_bar,
-            9 => s.sidebar = !s.sidebar,
-            10 => s.refresh_ms = match s.refresh_ms { 500 => 1000, 1000 => 2000, 2000 => 5000, _ => 500 },
-            11 => s.light_theme = !s.light_theme,
-            12 => s.confirm_stop_scan = !s.confirm_stop_scan,
-            13 => {
+            8 => s.net_bits = !s.net_bits,
+            9 => s.status_bar = !s.status_bar,
+            10 => s.sidebar = !s.sidebar,
+            11 => s.refresh_ms = match s.refresh_ms { 500 => 1000, 1000 => 2000, 2000 => 5000, _ => 500 },
+            12 => s.light_theme = !s.light_theme,
+            13 => s.confirm_stop_scan = !s.confirm_stop_scan,
+            14 => {
                 self.confirm = Some(Confirm::ResetSettings);
                 return;
             }
             _ => {}
         }
+        crate::util::set_net_bits(self.s.net_bits);
         self.save_settings();
     }
 
@@ -1395,7 +1399,7 @@ impl App {
     }
 }
 
-pub const SETTINGS_ITEMS: [&str; 14] = [
+pub const SETTINGS_ITEMS: [&str; 15] = [
     "Temperature unit (Celsius / Fahrenheit)",
     "Show exited processes",
     "Smooth CPU readings",
@@ -1404,6 +1408,7 @@ pub const SETTINGS_ITEMS: [&str; 14] = [
     "Show combined GPUs",
     "Show combined disks",
     "Show combined network",
+    "Network rate unit (bytes / bits per second)",
     "Status bar",
     "Sidebar",
     "Refresh interval",

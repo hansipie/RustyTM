@@ -35,6 +35,27 @@ pub fn rate(n: f64) -> String {
     format!("{}/s", bytes(n))
 }
 
+static NET_BITS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_net_bits(on: bool) {
+    NET_BITS.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Network throughput, in bits per second (decimal units) or bytes per second depending on the setting.
+pub fn net_rate(n: f64) -> String {
+    if !NET_BITS.load(std::sync::atomic::Ordering::Relaxed) {
+        return rate(n);
+    }
+    const U: [&str; 5] = ["b", "Kb", "Mb", "Gb", "Tb"];
+    let mut v = n * 8.0;
+    let mut i = 0;
+    while v >= 1000.0 && i < U.len() - 1 {
+        v /= 1000.0;
+        i += 1;
+    }
+    if i == 0 || v >= 100.0 { format!("{:.0} {}/s", v, U[i]) } else { format!("{:.1} {}/s", v, U[i]) }
+}
+
 pub fn run(cmd: &str, args: &[&str]) -> Option<String> {
     let out = Command::new(cmd).args(args).output().ok()?;
     if !out.status.success() {

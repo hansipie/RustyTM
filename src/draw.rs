@@ -207,7 +207,7 @@ fn summary(f: &mut Frame, area: Rect, a: &App) {
     let dw: f64 = a.disks.iter().map(|d| d.write_rate).sum();
     spark(f, mid[0], format!("Disk R {} W {}", rate(dr), rate(dw)), &a.hist.disk, Some(100), Color::Blue, a);
     let (rx, tx) = a.nets.iter().filter(|n| n.name != "lo").fold((0.0, 0.0), |s, n| (s.0 + n.rx_rate, s.1 + n.tx_rate));
-    spark(f, mid[1], format!("Network ↓ {} ↑ {}", rate(rx), rate(tx)), &a.hist.rx, None, Color::Magenta, a);
+    spark(f, mid[1], format!("Network ↓ {} ↑ {}", net_rate(rx), net_rate(tx)), &a.hist.rx, None, Color::Magenta, a);
     let gt = match a.gpu_now.first() {
         Some(g) => format!("GPU {:.0}% {}", g.util.unwrap_or(0.0), g.temp.map(|t| a.s.temp(t as f64)).unwrap_or_default()),
         None => "GPU (none detected)".into(),
@@ -508,8 +508,8 @@ fn perf_net(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
         Some(n) => (a.dh.get(&format!("rx:{}", n.name)).unwrap_or(&empty), a.dh.get(&format!("tx:{}", n.name)).unwrap_or(&empty)),
         None => (&a.hist.rx, &a.hist.tx),
     };
-    spark(f, v[0], format!("Receive {}", rate(rx)), hr, None, Color::Magenta, a);
-    spark(f, v[1], format!("Send {}", rate(tx)), ht, None, Color::LightBlue, a);
+    spark(f, v[0], format!("Receive {}", net_rate(rx)), hr, None, Color::Magenta, a);
+    spark(f, v[1], format!("Send {}", net_rate(tx)), ht, None, Color::LightBlue, a);
     let mut l = Vec::new();
     for n in sel {
         l.push(line(&format!("{}{}", n.name, if n.up { "" } else { " (down)" }), if n.wireless { "Wi-Fi".into() } else { "Ethernet / other".into() }));
@@ -753,7 +753,7 @@ fn recorder(f: &mut Frame, area: Rect, a: &mut App) {
         f.render_widget(Sparkline::default().block(block(format!("CPU {:.0}%", s.cpu_overall), a)).data(&hist).max(100).style(Style::new().fg(Color::Green)), v[1]);
         let mut l = vec![
             line("Memory in use", bytes(s.mem_used as f64)),
-            line("Network ↓ / ↑", format!("{} / {}", rate(s.net_rx), rate(s.net_tx))),
+            line("Network ↓ / ↑", format!("{} / {}", net_rate(s.net_rx), net_rate(s.net_tx))),
             line("Disk read / write", format!("{} / {}", rate(s.disk_read), rate(s.disk_write))),
             line("Package power", s.power_w.map(|p| format!("{p:.1} W")).unwrap_or_else(|| "n/a".into())),
         ];
@@ -908,6 +908,7 @@ fn settings(f: &mut Frame, area: Rect, a: &mut App) {
         onoff(s.combined_gpus),
         onoff(s.combined_disks),
         onoff(s.combined_network),
+        if s.net_bits { "Bits per second".into() } else { "Bytes per second".into() },
         onoff(s.status_bar),
         onoff(s.sidebar),
         format!("{} ms", s.refresh_ms),
