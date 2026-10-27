@@ -89,6 +89,7 @@ pub fn draw(f: &mut Frame, a: &mut App) {
         P_CONN => connections(f, c, a),
         P_APPS => installed(f, c, a),
         P_DRIVERS => drivers(f, c, a),
+        P_HEALTH => health(f, c, a),
         P_DISK => disk_space(f, c, a),
         P_BENCH => benchmarks(f, c, a),
         _ => settings(f, c, a),
@@ -123,7 +124,8 @@ fn hints(a: &App) -> &'static str {
         P_SYSINFO => "↑↓ scroll  E export  r reload",
         P_RECORDER => "r record/stop  s save  d discard  Enter replay  o open file  (replay: Space play  ,/. step  x close)",
         P_CONN => "a all  l listening  p public  t IPC  g process  r reload  / filter",
-        P_APPS => "p packages without desktop entries  r reload  / filter",
+        P_APPS => "u uninstall  p packages without desktop entries  r reload  / filter",
+        P_HEALTH => "r reload",
         P_DRIVERS => "Enter details  l loaded only  r reload  / filter",
         P_DISK => "Enter scan mount  c choose folder  Space pause  x stop  v view",
         P_BENCH => "a all  c cpu  d disk  g gpu  i internet  f folder  C clear  Esc cancel",
@@ -695,6 +697,51 @@ fn drivers(f: &mut Frame, area: Rect, a: &mut App) {
     a.offset[P_DRIVERS] = off;
 }
 
+fn health(f: &mut Frame, area: Rect, a: &mut App) {
+    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(6), Constraint::Length(12)]).split(area);
+    let Some(h) = a.health.clone() else {
+        f.render_widget(Paragraph::new("Reading disk health…").block(block(page_title(a, P_HEALTH, ""), a)), area);
+        return;
+    };
+    let rows: Vec<Vec<String>> = h
+        .disks
+        .iter()
+        .map(|d| {
+            vec![
+                d.dev.clone(),
+                d.model.clone(),
+                d.kind.clone(),
+                bytes(d.size as f64),
+                crate::collect::health::verdict(d).into(),
+                d.temp.map_or("n/a".into(), |t| a.s.temp(t as f64)),
+                d.power_on_hours.map_or("n/a".into(), |h| format!("{h} h")),
+                d.wear_used.map_or("n/a".into(), |w| format!("{w}%")),
+            ]
+        })
+        .collect();
+    let t = page_title(a, P_HEALTH, "SMART");
+    let mut off = a.offset[P_HEALTH];
+    table(f, v[0], t, &["Disk", "Model", "Type", "Size", "Health", "Temp", "Power on", "Wear used"], &[Constraint::Length(10), Constraint::Min(20), Constraint::Length(6), Constraint::Length(10), Constraint::Length(9), Constraint::Length(8), Constraint::Length(10), Constraint::Length(10)], rows, a.sel[P_HEALTH], &mut off, a);
+    a.offset[P_HEALTH] = off;
+    let mut l: Vec<Line> = Vec::new();
+    for n in &h.notes {
+        l.push(Line::from(Span::styled(n.clone(), Style::new().fg(Color::Yellow))));
+    }
+    if let Some(d) = h.disks.get(a.sel[P_HEALTH]) {
+        l.push(Line::from(format!("{} {}  serial {}  firmware {}", d.dev, d.model, if d.serial.is_empty() { "n/a" } else { &d.serial }, if d.firmware.is_empty() { "n/a" } else { &d.firmware })));
+        if let Some(c) = d.power_cycles {
+            l.push(line("  Power cycles", c.to_string()));
+        }
+        for (k, val) in &d.details {
+            l.push(line(&format!("  {k}"), val.clone()));
+        }
+        if !d.note.is_empty() {
+            l.push(Line::from(Span::styled(d.note.clone(), Style::new().fg(Color::Yellow))));
+        }
+    }
+    f.render_widget(Paragraph::new(l).wrap(Wrap { trim: true }).block(block("Selected disk", a)), v[1]);
+}
+
 // ───────────── system info ─────────────
 
 fn sysinfo(f: &mut Frame, area: Rect, a: &mut App) {
@@ -954,6 +1001,7 @@ fn overlays(f: &mut Frame, area: Rect, a: &App) {
             Confirm::Disconnect(id, u) => format!("Sign off session {id} of {u}? This ends the session and closes everything running in it."),
             Confirm::Quit => "The captured Flight Recorder trace is unsaved. Quit and discard it?".into(),
             Confirm::DiscardTrace => "Close and discard the captured trace?".into(),
+            Confirm::Uninstall { text, .. } => text.clone(),
             Confirm::ResetSettings => "Reset every setting to its default?".into(),
         };
         let r = centered(area, 64, 7);

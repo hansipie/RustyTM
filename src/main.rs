@@ -194,6 +194,7 @@ fn self_test(w: u16, h: u16) {
             P_CONN => format!("{} sockets in scope", a.scope_conns().len()),
             P_APPS => format!("{} apps (+{} packages)", a.apps.iter().filter(|x| !x.packages_only).count(), a.apps.iter().filter(|x| x.packages_only).count()),
             P_DRIVERS => a.mods.as_ref().map(|m| format!("{} modules, {} loaded", m.modules.len(), m.modules.iter().filter(|x| x.loaded).count())).unwrap_or_default(),
+            P_HEALTH => a.health.as_ref().map(|h| format!("{} disks", h.disks.len())).unwrap_or_default(),
             P_SYSINFO => format!("{} sections", a.sysinfo.len()),
             P_POWER => format!("{} sensors", a.sensors.len()),
             _ => format!("{rows} rows"),

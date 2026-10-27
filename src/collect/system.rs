@@ -768,8 +768,15 @@ pub fn system_info(cpu: &CpuStatic, disks: &[DiskStat], nets: &[NetStat], gpus: 
             kv("Stall (PSI some, 10s)", format!("{:.2}%", m.psi_some10)),
             kv("Page ins", bytes(m.page_in_kb as f64 * 1024.0)),
             kv("Page outs", bytes(m.page_out_kb as f64 * 1024.0)),
-        ],
+        ]
+        .into_iter()
+        .chain(memory_details())
+        .collect(),
     ));
+    let wifi = wifi_details(nets);
+    if !wifi.is_empty() {
+        out.push(("Wi-Fi".into(), wifi));
+    }
     out.push((
         "Storage".into(),
         disks
@@ -860,6 +867,117 @@ pub fn system_info(cpu: &CpuStatic, disks: &[DiskStat], nets: &[NetStat], gpus: 
         ],
     ));
     out
+}
+
+fn meminfo_kb(key: &str) -> Option<u64> {
+    read("/proc/meminfo")?.lines().find_map(|l| l.strip_prefix(key)?.strip_prefix(':')?.split_whitespace().next()?.parse().ok())
+}
+
+/// Memory modules (dmidecode, root only) plus kernel memory configuration readable by anyone.
+fn memory_details() -> Vec<(String, String)> {
+    let mut v: Vec<(String, String)> = Vec::new();
+    let mut add = |k: &str, val: String| v.push((k.to_string(), val));
+    let dm = if unsafe { libc::geteuid() } == 0 { run("dmidecode", &["-t", "17"]) } else { run("sudo", &["-n", "dmidecode", "-t", "17"]) };
+    match dm {
+        Some(t) => {
+            let mut n = 0;
+            for blk in t.split("\n\n").filter(|b| b.contains("Memory Device")) {
+                let g = |k: &str| blk.lines().find_map(|l| l.trim().strip_prefix(k).map(|x| x.trim().to_string())).unwrap_or_default();
+                let size = g("Size:");
+                if size.is_empty() || size.starts_with("No Module") {
+                    continue;
+                }
+                n += 1;
+                let speed = g("Configured Memory Speed:");
+                let speed = if speed.is_empty() || speed == "Unknown" { g("Speed:") } else { speed };
+                add(&format!("Module {n} ({})", g("Locator:")), format!("{size} {} {} @ {speed}, {} {}", g("Type:"), g("Form Factor:"), g("Manufacturer:"), g("Part Number:").trim()));
+            }
+            if n == 0 {
+                add("Memory modules", "none reported".into());
+            }
+        }
+        None => add("Memory modules", "n/a (needs root: dmidecode)".into()),
+    }
+    if let Some(b) = read("/sys/devices/system/memory/block_size_bytes").and_then(|s| u64::from_str_radix(&s, 16).ok()) {
+        add("Memory block size", bytes(b as f64));
+    }
+    if let Some(x) = read("/sys/kernel/mm/transparent_hugepage/enabled") {
+        add("Transparent huge pages", x.split_whitespace().find(|w| w.starts_with('[')).map(|w| w.trim_matches(|c| c == '[' || c == ']').to_string()).unwrap_or(x));
+    }
+    if let (Some(t), Some(sz)) = (meminfo_kb("HugePages_Total"), meminfo_kb("Hugepagesize")) {
+        add("Huge pages", format!("{t} x {}", bytes(sz as f64 * 1024.0)));
+    }
+    for (label, key) in [("Active", "Active"), ("Inactive", "Inactive"), ("Mapped", "Mapped"), ("Dirty", "Dirty"), ("Writeback", "Writeback"), ("Swap cached", "SwapCached"), ("Page tables", "PageTables")] {
+        if let Some(k) = meminfo_kb(key) {
+            add(label, bytes(k as f64 * 1024.0));
+        }
+    }
+    if let Some(s) = read("/proc/sys/vm/swappiness") {
+        add("Swappiness", s);
+    }
+    if let Some(s) = read("/proc/sys/vm/overcommit_memory") {
+        add("Overcommit mode", match s.as_str() { "0" => "0 (heuristic)".into(), "1" => "1 (always)".into(), "2" => "2 (strict)".into(), o => o.to_string() });
+    }
+    if let Some(t) = read("/proc/swaps") {
+        for l in t.lines().skip(1) {
+            let f: Vec<&str> = l.split_whitespace().collect();
+            if f.len() >= 4 {
+                add(&format!("Swap {}", f[0]), format!("{} {}, {} used", f[1], bytes(f[2].parse::<f64>().unwrap_or(0.0) * 1024.0), bytes(f[3].parse::<f64>().unwrap_or(0.0) * 1024.0)));
+            }
+        }
+    }
+    v
+}
+
+fn wifi_details(nets: &[NetStat]) -> Vec<(String, String)> {
+    let mut v = Vec::new();
+    let wl: Vec<&NetStat> = nets.iter().filter(|n| std::path::Path::new(&format!("/sys/class/net/{}/wireless", n.name)).exists() || std::path::Path::new(&format!("/sys/class/net/{}/phy80211", n.name)).exists()).collect();
+    for n in wl {
+        let nm = &n.name;
+        let mut add = |k: &str, val: String| v.push((format!("{nm} {k}"), val));
+        add("driver", read(&format!("/sys/class/net/{nm}/device/driver/module/drivers")).or_else(|| std::fs::read_link(format!("/sys/class/net/{nm}/device/driver")).ok().and_then(|p| p.file_name().map(|s| s.to_string_lossy().into_owned()))).unwrap_or_else(|| "n/a".into()));
+        add("state", if n.up { "Up".into() } else { "Down".into() });
+        let link = run("iw", &["dev", nm, "link"]).unwrap_or_default();
+        if link.contains("Not connected") || link.is_empty() {
+            add("connection", if link.is_empty() { "n/a (iw not installed or no access)".into() } else { "Not connected".into() });
+        }
+        for l in link.lines().map(str::trim) {
+            if let Some(r) = l.strip_prefix("SSID:") {
+                add("network (SSID)", r.trim().into());
+            } else if let Some(r) = l.strip_prefix("freq:") {
+                add("frequency", format!("{} MHz", r.trim()));
+            } else if let Some(r) = l.strip_prefix("signal:") {
+                add("signal", r.trim().into());
+            } else if let Some(r) = l.strip_prefix("rx bitrate:") {
+                add("receive rate", r.trim().into());
+            } else if let Some(r) = l.strip_prefix("tx bitrate:") {
+                add("transmit rate", r.trim().into());
+            } else if l.starts_with("Connected to ") {
+                add("access point (BSSID)", l.split_whitespace().nth(2).unwrap_or("").into());
+            }
+        }
+        if let Some(t) = run("iw", &["dev", nm, "get", "power_save"]) {
+            add("power save", t.trim().trim_start_matches("Power save:").trim().into());
+        }
+        if let Some(t) = run("nmcli", &["-t", "-f", "IN-USE,CHAN,SECURITY,RATE", "dev", "wifi", "list", "ifname", nm]) {
+            if let Some(l) = t.lines().find(|l| l.starts_with('*')) {
+                let f: Vec<&str> = l.split(':').collect();
+                if f.len() >= 4 {
+                    add("channel", f[1].into());
+                    add("security", if f[2].is_empty() { "Open".into() } else { f[2].into() });
+                }
+            }
+        }
+        if let Some(t) = read("/proc/net/wireless") {
+            if let Some(l) = t.lines().find(|l| l.trim_start().starts_with(&format!("{nm}:"))) {
+                let f: Vec<&str> = l.split_whitespace().collect();
+                if f.len() >= 4 {
+                    add("link quality", f[2].trim_end_matches('.').to_string());
+                }
+            }
+        }
+    }
+    v
 }
 
 fn chassis(code: String) -> String {

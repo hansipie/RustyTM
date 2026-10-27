@@ -465,6 +465,97 @@ pub fn installed_apps() -> Vec<App> {
     apps
 }
 
+/// What uninstalling an app would run: a label for the confirmation and the command line.
+pub struct UninstallPlan {
+    pub package: String,
+    pub manager: &'static str,
+    pub argv: Vec<String>,
+}
+
+fn can_escalate() -> bool {
+    which("pkexec") && (std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some())
+}
+
+fn as_root(argv: Vec<&str>) -> Result<Vec<String>, String> {
+    let mut v: Vec<String> = argv.into_iter().map(String::from).collect();
+    if unsafe { libc::geteuid() } == 0 {
+        return Ok(v);
+    }
+    if can_escalate() {
+        v.insert(0, "pkexec".into());
+        return Ok(v);
+    }
+    Err(format!("Administrator rights are needed and no graphical prompt is available. Run: sudo {}", v.join(" ")))
+}
+
+pub fn uninstall_plan(a: &App) -> Result<UninstallPlan, String> {
+    let stem = Path::new(&a.file).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    match a.source {
+        "flatpak" => {
+            if !which("flatpak") || stem.is_empty() {
+                return Err("flatpak is not available.".into());
+            }
+            let scope = if a.scope == "User installed" { "--user" } else { "--system" };
+            let argv = ["flatpak", "uninstall", "-y", "--noninteractive", scope, &stem].iter().map(|s| s.to_string()).collect();
+            Ok(UninstallPlan { package: stem, manager: "flatpak", argv })
+        }
+        "snap" => {
+            let name = stem.split('_').next().unwrap_or("").to_string();
+            if name.is_empty() {
+                return Err("Could not tell which snap owns this entry.".into());
+            }
+            let argv = as_root(vec!["snap", "remove", &name])?;
+            Ok(UninstallPlan { package: name, manager: "snap", argv })
+        }
+        _ => {
+            if a.scope == "User installed" && !a.packages_only {
+                return Err("This entry lives in your home folder and is not owned by a package manager.".into());
+            }
+            let owner = |tool: &str, args: &[&str]| run(tool, args).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+            if a.source == "rpm" || (!a.packages_only && which("rpm") && !Path::new("/var/lib/dpkg/status").exists()) {
+                let pkg = if a.packages_only { a.name.clone() } else { owner("rpm", &["-qf", "--qf", "%{NAME}", &a.file]).ok_or("No installed rpm package owns this file.")? };
+                if Path::new("/run/ostree-booted").exists() && which("rpm-ostree") {
+                    let argv = as_root(vec!["rpm-ostree", "uninstall", &pkg])?;
+                    return Ok(UninstallPlan { package: pkg, manager: "rpm-ostree (layered packages only; takes effect after reboot)", argv });
+                }
+                if which("dnf") {
+                    let argv = as_root(vec!["dnf", "remove", "-y", &pkg])?;
+                    return Ok(UninstallPlan { package: pkg, manager: "dnf", argv });
+                }
+                let argv = as_root(vec!["rpm", "-e", &pkg])?;
+                return Ok(UninstallPlan { package: pkg, manager: "rpm", argv });
+            }
+            if a.source.starts_with("deb") || which("dpkg") {
+                let pkg = if a.packages_only {
+                    a.name.clone()
+                } else {
+                    let o = owner("dpkg", &["-S", &a.file]).ok_or("No installed deb package owns this file.")?;
+                    o.lines().next().and_then(|l| l.split(':').next()).unwrap_or("").to_string()
+                };
+                if pkg.is_empty() {
+                    return Err("Could not tell which package owns this file.".into());
+                }
+                let argv = as_root(vec!["apt-get", "remove", "-y", &pkg])?;
+                return Ok(UninstallPlan { package: pkg, manager: "apt", argv });
+            }
+            Err("No supported package manager found for this entry.".into())
+        }
+    }
+}
+
+pub fn uninstall(argv: &[String]) -> Result<String, String> {
+    let (cmd, args) = argv.split_first().ok_or("empty command")?;
+    match std::process::Command::new(cmd).args(args).stdin(std::process::Stdio::null()).output() {
+        Ok(o) if o.status.success() => Ok("Uninstalled.".into()),
+        Ok(o) => {
+            let e = String::from_utf8_lossy(&o.stderr);
+            let last: Vec<&str> = e.lines().rev().filter(|l| !l.trim().is_empty()).take(2).collect();
+            Err(format!("Uninstall failed: {}", if last.is_empty() { "the command reported an error".into() } else { last.into_iter().rev().collect::<Vec<_>>().join(" ") }))
+        }
+        Err(e) => Err(format!("Could not run {cmd}: {e}")),
+    }
+}
+
 // ───────────────────────────── Startup apps ─────────────────────────────
 
 #[derive(Clone, Debug)]

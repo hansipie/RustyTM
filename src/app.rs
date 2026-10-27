@@ -1,4 +1,5 @@
 use crate::bench::{self, Bench, BenchResult, Kind};
+use crate::collect::health::HealthResult;
 use crate::collect::inventory::{self as inv, App as InstalledApp, ConnResult, ModuleResult, Service, Session, Startup};
 use crate::collect::proc::{self, Proc, ProcSampler};
 use crate::collect::system::*;
@@ -12,8 +13,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-pub const PAGES: [&str; 16] = [
-    "Summary", "Processes", "Performance", "App history", "Startup apps", "Users", "Services", "System Info", "Power & Freq", "Flight Recorder", "Connections", "Installed Apps", "Drivers", "Disk Space", "Benchmarks", "Settings",
+pub const PAGES: [&str; 17] = [
+    "Summary", "Processes", "Performance", "App history", "Startup apps", "Users", "Services", "System Info", "Power & Freq", "Flight Recorder", "Connections", "Installed Apps", "Drivers", "Disk Space", "Benchmarks", "Disk Health", "Settings",
 ];
 pub const P_SUMMARY: usize = 0;
 pub const P_PROCESSES: usize = 1;
@@ -30,7 +31,8 @@ pub const P_APPS: usize = 11;
 pub const P_DRIVERS: usize = 12;
 pub const P_DISK: usize = 13;
 pub const P_BENCH: usize = 14;
-pub const P_SETTINGS: usize = 15;
+pub const P_HEALTH: usize = 15;
+pub const P_SETTINGS: usize = 16;
 
 pub const HIST_LEN: usize = 120;
 pub const PROC_COLS: [&str; 9] = ["Name", "PID", "CPU", "Memory", "Disk read", "Disk write", "User", "Status", "Threads"];
@@ -40,7 +42,7 @@ pub fn page_from_name(n: &str) -> Option<usize> {
     let alias: &[(&str, usize)] = &[
         ("summary", 0), ("processes", 1), ("process", 1), ("performance", 2), ("apphistory", 3), ("history", 3), ("startup", 4), ("startupapps", 4), ("users", 5), ("services", 6),
         ("sysinfo", 7), ("systeminfo", 7), ("powerfreq", 8), ("powerandfreq", 8), ("power", 8), ("recorder", 9), ("flightrecorder", 9), ("flight", 9), ("connections", 10), ("networkconnections", 10),
-        ("installedapps", 11), ("apps", 11), ("drivers", 12), ("kernelmodules", 12), ("diskspace", 13), ("disk", 13), ("benchmarks", 14), ("benchmark", 14), ("settings", 15),
+        ("installedapps", 11), ("apps", 11), ("drivers", 12), ("kernelmodules", 12), ("diskspace", 13), ("disk", 13), ("benchmarks", 14), ("benchmark", 14), ("diskhealth", 15), ("health", 15), ("smart", 15), ("settings", 16),
     ];
     alias.iter().find(|(a, _)| *a == n).map(|x| x.1)
 }
@@ -88,6 +90,7 @@ pub enum Confirm {
     Quit,
     DiscardTrace,
     ResetSettings,
+    Uninstall { name: String, argv: Vec<String>, text: String },
 }
 
 pub struct Overlay {
@@ -122,9 +125,9 @@ pub struct App {
     pub confirm: Option<Confirm>,
     pub overlay: Option<Overlay>,
     pub help: bool,
-    pub sel: [usize; 16],
-    pub filter: [String; 16],
-    pub offset: [usize; 16],
+    pub sel: [usize; 17],
+    pub filter: [String; 17],
+    pub offset: [usize; 17],
 
     // sampled data
     pub cpu_static: CpuStatic,
@@ -174,6 +177,9 @@ pub struct App {
     pub show_ipc: bool,
     pub apps: Vec<InstalledApp>,
     apps_bg: Bg<Vec<InstalledApp>>,
+    health_bg: Bg<HealthResult>,
+    pub health: Option<HealthResult>,
+    uninstall_bg: Bg<Result<String, String>>,
     pub apps_loaded: bool,
     pub show_pkgs: bool,
     pub mods: Option<ModuleResult>,
@@ -232,9 +238,9 @@ impl App {
             confirm: None,
             overlay: None,
             help: false,
-            sel: [0; 16],
+            sel: [0; 17],
             filter: Default::default(),
-            offset: [0; 16],
+            offset: [0; 17],
             cpu_static,
             cpu_sampler: CpuSampler::default(),
             proc_sampler: ProcSampler::new(),
@@ -276,6 +282,9 @@ impl App {
             show_ipc: false,
             apps: vec![],
             apps_bg: Bg::new(),
+            health_bg: Bg::new(),
+            health: None,
+            uninstall_bg: Bg::new(),
             apps_loaded: false,
             show_pkgs: false,
             mods: None,
@@ -496,6 +505,18 @@ impl App {
             self.apps = v;
             self.apps_loaded = true;
         }
+        if let Some(r) = self.uninstall_bg.poll() {
+            match r {
+                Ok(m) => {
+                    self.say(m);
+                    self.refresh_page(P_APPS);
+                }
+                Err(e) => self.say(e),
+            }
+        }
+        if let Some(v) = self.health_bg.poll() {
+            self.health = Some(v);
+        }
         if let Some(v) = self.mods_bg.poll() {
             self.mods = Some(v);
         }
@@ -510,7 +531,8 @@ impl App {
             P_USERS => self.sess_bg.busy(),
             P_SERVICES => self.svc_bg.busy(),
             P_CONN => self.conn_bg.busy(),
-            P_APPS => self.apps_bg.busy(),
+            P_HEALTH => self.health_bg.busy(),
+            P_APPS => self.apps_bg.busy() || self.uninstall_bg.busy(),
             P_DRIVERS => self.mods_bg.busy(),
             P_SYSINFO => self.sysinfo_bg.busy(),
             _ => false,
@@ -526,6 +548,7 @@ impl App {
             P_CONN => self.conn_bg.spawn(inv::connections),
             P_APPS => self.apps_bg.spawn(inv::installed_apps),
             P_DRIVERS => self.mods_bg.spawn(inv::modules),
+            P_HEALTH => self.health_bg.spawn(crate::collect::health::disks),
             P_SYSINFO => {
                 let (c, d, n, g) = (self.cpu_static.clone(), self.disks.clone(), self.nets.clone(), self.gpu_now.clone());
                 self.sysinfo_bg.spawn(move || system_info(&c, &d, &n, &g));
@@ -690,6 +713,7 @@ impl App {
             P_DRIVERS => self.module_view().len(),
             P_RECORDER => self.traces.len(),
             P_SETTINGS => SETTINGS_ITEMS.len(),
+            P_HEALTH => self.health.as_ref().map_or(0, |h| h.disks.len()),
             P_DISK => self.mounts.len(),
             _ => 0,
         }
@@ -754,7 +778,7 @@ impl App {
                 self.prompt = Some(Prompt { kind: PromptKind::Run, label: "Type the name of a program, and it will be run".into(), buf: String::new() });
                 return;
             }
-            KeyCode::Char('/') if !matches!(self.page, P_SUMMARY | P_PERF | P_SYSINFO | P_BENCH | P_SETTINGS | P_DISK | P_RECORDER) => {
+            KeyCode::Char('/') if !matches!(self.page, P_SUMMARY | P_PERF | P_SYSINFO | P_BENCH | P_SETTINGS | P_DISK | P_RECORDER | P_HEALTH) => {
                 self.prompt = Some(Prompt { kind: PromptKind::Filter, label: format!("Filter {}", PAGES[self.page]), buf: self.filter[self.page].clone() });
                 return;
             }
@@ -796,7 +820,13 @@ impl App {
                 match k.code {
                     KeyCode::Char('p') => self.show_pkgs = !self.show_pkgs,
                     KeyCode::Char('r') => self.refresh_page(P_APPS),
+                    KeyCode::Char('u') | KeyCode::Delete => self.ask_uninstall(),
                     _ => {}
+                }
+            }
+            P_HEALTH => {
+                if let KeyCode::Char('r') = k.code {
+                    self.refresh_page(P_HEALTH);
                 }
             }
             P_DRIVERS => match k.code {
@@ -919,6 +949,20 @@ impl App {
         }
     }
 
+    fn ask_uninstall(&mut self) {
+        if self.uninstall_bg.busy() {
+            return self.say("An uninstall is already running.");
+        }
+        let Some(app) = self.app_view().get(self.sel[P_APPS]).map(|a| (*a).clone()) else { return };
+        match inv::uninstall_plan(&app) {
+            Ok(p) => {
+                let text = format!("Uninstall \"{}\" ({}: {})? Command: {}", app.name, p.manager, p.package, p.argv.join(" "));
+                self.confirm = Some(Confirm::Uninstall { name: app.name, argv: p.argv, text });
+            }
+            Err(e) => self.say(e),
+        }
+    }
+
     fn confirm_key(&mut self, c: Confirm, k: KeyEvent) {
         if !matches!(k.code, KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter) {
             return;
@@ -926,6 +970,10 @@ impl App {
         match c {
             Confirm::Signal { pids, sig, .. } => self.do_signal(&pids, sig),
             Confirm::StopScan => self.scanner.stop(),
+            Confirm::Uninstall { name, argv, .. } => {
+                self.say(format!("Uninstalling {name}…"));
+                self.uninstall_bg.spawn(move || inv::uninstall(&argv));
+            }
             Confirm::ClearHistory => {
                 self.bench_hist.clear();
                 if let Err(e) = bench::save_history(&[]) {
