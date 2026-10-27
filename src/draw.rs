@@ -961,7 +961,8 @@ fn overlays(f: &mut Frame, area: Rect, a: &App) {
     }
     if a.help {
         let text = "Pages:   Tab / Shift-Tab / [ ] / ← →\nQuit:    q or Ctrl-C        Filter: /  (Esc clears)\nSidebar: b                   Status bar: B\nRun new task: N              Help: ?\n\nProcesses:  ↑↓ PgUp PgDn  Enter details  x terminate (SIGTERM)  K kill (SIGKILL)\n            X terminate/force the whole tree (x then X)  p suspend  c continue\n            s send signal  n nice  a affinity  t tree  Space fold  E fold all\n            e show exited  v values/percent  < > sort column  o order  C copy cmdline\n            Y copy name  W search online  m write a sample report\n\nFlight Recorder:  r record  s save  d discard  Enter replay  Space play/pause  ,/. step\n                  PgUp/PgDn ±30 samples  x close replay\n\nDisk space:  Enter measure selected disk  c choose folder to measure\n\nBenchmarks:  a all  c cpu  d disk  g gpu  i internet  f folder  C clear history";
-        let r = centered(area, 86, 18);
+        let w = text.lines().map(|l| l.chars().count()).max().unwrap_or(0) as u16 + 2;
+        let r = centered(area, w, text.lines().count() as u16 + 2);
         f.render_widget(Clear, r);
         f.render_widget(Paragraph::new(text).block(block("Help — press any key", a)), r);
     }
