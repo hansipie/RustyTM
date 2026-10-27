@@ -1,0 +1,275 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="964" height="616" viewBox="0 0 964 616">
+<style>
+text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill:#d4d4d4;white-space:pre}
+.t{font-family:system-ui,sans-serif;font-size:18px;font-weight:600;fill:#fff}
+.s{opacity:0;animation:show 28.0s infinite}
+@keyframes show{0%{opacity:0}1.5%{opacity:1}11.00%{opacity:1}12.50%{opacity:0}100%{opacity:0}}
+</style>
+<rect width="964" height="616" rx="10" fill="#1e1e1e"/>
+<rect width="964" height="34" rx="10" fill="#2d2d2d"/>
+<circle cx="18" cy="17" r="6" fill="#ff5f56"/><circle cx="38" cy="17" r="6" fill="#ffbd2e"/><circle cx="58" cy="17" r="6" fill="#27c93f"/>
+<g class="s" style="animation-delay:0.0s">
+<text class="t" x="20" y="52">1/8 · Summary</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ CPU 4% — AMD Ryzen 7 5800H with Radeon Gra┐┌ Memory 11.6 GB / 30.8 GB (38%) ───────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││                                           ││                                           │</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││                                           ││                                           │</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      ││                                           ││                                           │</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      ││                                           ││▆▆▆                                        │</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││ ▁▁                                        ││███                                        │</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            │└───────────────────────────────────────────┘└───────────────────────────────────────────┘</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         │┌ Disk R 0 B/s W 0 B/s ───────┐┌ Network ↓ 0 B/s ↑ 0 B/s ──┐┌ GPU 0% 43°C ───────────────┐</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││                             ││ █                         ││                            │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││                             ││ █                         ││                            │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││                             ││ █                         ││                            │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││                             ││ █                         ││                            │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││                             ││ █                         ││                            │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          │└─────────────────────────────┘└───────────────────────────┘└────────────────────────────┘</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       │┌ Top processes by CPU ──────────────────────────────┐┌ Whole machine ───────────────────┐</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││Top processes           PID      CPU      Memory    ││System pressure   4.0%            │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││rustytm                 227293   1.6%     4.9 MB    ││█░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││gnome-shell             11702    1.2%     271 MB    ││                                  │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││firefox-bin             131003   0.2%     1.0 GB    ││Memory stall (PSI)        0.17%   │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Isolated Web Co         132311   0.2%     472 MB    ││Swap in use               1.9 GB  │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││claude                  18017    0.1%     469 MB    ││Kernel CPU                3.0%    │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││hermes                  1982     0.1%     310 MB    ││                                  │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││jetbrainsd              13681    0.0%     69.7 MB   ││                                  │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││ghostty                 16784    0.0%     150 MB    ││                                  │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Isolated Web Co         131485   0.0%     1.4 GB    ││                                  │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │└────────────────────────────────────────────────────┘└──────────────────────────────────┘</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │┌ System ────────────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││ Uptime 0:04:45:32   Load 2.25 1.39 1.01   Tasks 2/2344   Processes 547   Threads 2344  │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">Tab/←→ pages  ? help  q quit                                               CPU 4%  MEM 11.6 GB  Up 0:04:45:32</text>
+</g>
+<g class="s" style="animation-delay:3.5s">
+<text class="t" x="20" y="52">2/8 · Processes</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Processes — 551 total CPU 6% (551) ────────────────────────────────────────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Name               PID      CPU ▼    Memory   Disk rea Disk wri User     Status  Threads│</text>
+<text x="20" y="110" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││rustytm            226618   1.1%     4.9 MB   -        -        user    Running 2      │</text>
+<text x="20" y="127" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Performance      ││gnome-shell        11702    0.8%     273 MB   -        -        user    Sleepin 37     │</text>
+<text x="20" y="144" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ App history      ││Isolated Web Co    185908   0.5%     1.3 GB   -        -        user    Sleepin 30     │</text>
+<text x="20" y="161" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││firefox-bin        131003   0.2%     1.0 GB   -        -        user    Sleepin 132    │</text>
+<text x="20" y="178" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Users            ││claude             18017    0.1%     457 MB   -        -        user    Sleepin 30     │</text>
+<text x="20" y="195" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Services         ││Isolated Web Co    131485   0.1%     1.4 GB   -        -        user    Sleepin 35     │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││btrfs-transaction  720      0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="229" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││ghostty            16784    0.0%     150 MB   -        -        user    Sleepin 40     │</text>
+<text x="20" y="246" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││Isolated Web Co    131302   0.0%     674 MB   -        -        user    Sleepin 29     │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││napi/phy0-0        997      0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="280" textLength="916" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││pipewire           11703    0.0%     11.7 MB  -        -        user    Sleepin 3      │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││kworker/u64:9-even 172085   0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││systemd            1        0.0%     20.4 MB  -        -        root     Sleepin 1      │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││kthreadd           2        0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││pool_workqueue_rel 3        0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││kworker/R-rcu_gp   4        0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││kworker/R-sync_wq  5        0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││kworker/R-kvfree_r 6        0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││kworker/R-slub_flu 7        0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││kworker/R-netns    8        0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││kworker/0:0H-kbloc 10       0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││kworker/R-mm_percp 13       0.0%     0 B      -        -        root     Sleepin 1      │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │┌ Selection ─────────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="518" textLength="916" lengthAdjust="spacing" xml:space="preserve">│                  ││PID 226618  PPID 226616  nice 0  user  Running                                         │</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││./target/release/rustytm --dump=processes --size=110x30                                 │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">Enter details  x terminate  X tree  K kill  p/c stop/cont  s signal  n nic CPU 6%  MEM 12.9 GB  Up 0:04:45:01</text>
+</g>
+<g class="s" style="animation-delay:7.0s">
+<text class="t" x="20" y="52">3/8 · Performance</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Performance ─────────┐┌ CPU — AMD Ryzen 7 5800H with Radeon Graphics ──────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││ CPU               4% ││                                                                │</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││ Memory           42% ││                                                                │</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      ││ Disk nvme0n1      0% ││                                                                │</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      ││ Disk nvme1n1      0% ││                                                                │</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││ Network enp2s0       ││                                                                │</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            ││ Wi-Fi wlp3s0         ││                                                                │</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         ││ Network tailscale0   ││                                                                │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││ Network podman0      ││                                                                │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││ Network veth0        ││                                                                │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││ GPU 0 NVIDIA      0% ││                                                                │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││ GPU 1 AMD         5% ││                                                                │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││                      ││                                                                │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││                      ││                                                                │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││                      ││                                                                │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││                      ││                                                                │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││                      ││                                                                │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││ ▅▅                                                             │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      │└────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      │┌ CPU details  (g: graph mode, K: kernel times) ─────────────────┐</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Utilization               4.0%   kernel 3.0%                    │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Speed (avg / base)        2727 MHz / 3453 MHz                   │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Processes / threads       551 / 2395                            │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Up time                   0:04:45:02                            │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Cores / logical / sockets 8 / 16 / 1                            │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Caches                    L1d 32K  L1i 32K  L2 512K  L3 16384K  │</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Governor / driver         powersave / amd-pstate-epp            │</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                      ││Virtualization            Supported (VT-x / AMD-V)              │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└──────────────────────┘└────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">↑↓ device  g graph mode  K kernel times  c combined  ? help                CPU 4%  MEM 12.9 GB  Up 0:04:45:02</text>
+</g>
+<g class="s" style="animation-delay:10.5s">
+<text class="t" x="20" y="52">4/8 · System Info</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ System Info ───────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Hardware Overview                                                                       │</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││  Machine                       ASUSTeK COMPUTER INC. ROG Strix G713QR_G713QR           │</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      ││  Form factor                   Laptop                                                  │</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      ││  Firmware                      American Megatrends International, LLC. G713QR.331      │</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││  Processor                     AMD Ryzen 7 5800H with Radeon Graphics                  │</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            ││  Logical processors            16                                                      │</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         ││  Physical cores                8                                                       │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││  Sockets                       1                                                       │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││  NUMA nodes                    1                                                       │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││  Base frequency                3522 MHz                                                │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││  Current frequency             2317 MHz (avg)                                          │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││  Frequency driver              amd-pstate-epp                                          │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││  Frequency governor            powersave                                               │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││  Power preference              balance_performance                                     │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││  Virtualization                Supported (VT-x / AMD-V)                                │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││  L1d cache                     32K                                                     │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  L1i cache                     32K                                                     │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  L2 cache                      512K                                                    │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  L3 cache                      16384K                                                  │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                                                        │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Memory                                                                                  │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  Physical memory               30.8 GB                                                 │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  In use                        12.9 GB                                                 │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  Available                     17.9 GB                                                 │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  Cached                        15.6 GB                                                 │</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  Buffers                       544 KB                                                  │</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││  Shared                        861 MB                                                  │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">↑↓ scroll  E export  r reload                                              CPU 9%  MEM 12.8 GB  Up 0:04:45:04</text>
+</g>
+<g class="s" style="animation-delay:14.0s">
+<text class="t" x="20" y="52">5/8 · Power &amp; Freq</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Power &amp; Freq — power and frequency sensors (48) ───────────────────────────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Group                  Device                    Sensor                   Value         │</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││Temperatures           acpitz                    temp1                    64°C          │</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      ││Temperatures           mt7921_phy0               temp1                    48°C          │</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      ││Voltages               BAT0                      in0                      15.70 V       │</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││Powers                 BAT0                      power1                   0.00 W        │</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            ││Temperatures           nvme                      Composite                33°C          │</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         ││Temperatures           nvme                      Sensor 1                 33°C          │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││Temperatures           nvme                      Sensor 2                 43°C          │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││Temperatures           nvme                      Composite                35°C          │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││Temperatures           nvme                      Sensor 1                 36°C          │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││Clocks                 amdgpu                    sclk                     400 MHz       │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││Voltages               amdgpu                    vddgfx                   0.86 V        │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││Voltages               amdgpu                    vddnb                    0.92 V        │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││Powers                 amdgpu                    PPT                      5.00 W        │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││Temperatures           amdgpu                    edge                     42°C          │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││Counters               ucsi_source_psy_USBC000:0 curr1                    0.00 A        │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Voltages               ucsi_source_psy_USBC000:0 in0                      0.00 V        │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Temperatures           k10temp                   Tctl                     62°C          │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Fans                   asus                      cpu_fan                  3200 RPM      │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Fans                   asus                      gpu_fan                  3000 RPM      │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Temperatures           acpi-thermal-zones        acpitz                   64°C          │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Clocks                 cpufreq                   Core 0 clock             2340 MHz      │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Clocks                 cpufreq                   Core 1 clock             1103 MHz      │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │┌ Source access ─────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Access needed: intel-rapl energy counter (read permission, which by default only root ha│</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                                                        │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">Tab/←→ pages  ? help  q quit                                               CPU 5%  MEM 12.8 GB  Up 0:04:45:05</text>
+</g>
+<g class="s" style="animation-delay:17.5s">
+<text class="t" x="20" y="52">6/8 · Drivers</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Kernel memory ─────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Kernel modules for Linux 7.2.9-ogc3.1.fc44.x86_64 — 187 loaded, 5436 known. Module memor│</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││                                                                                        │</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      │┌ Drivers — all (5436) ──────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││Module                     Used by                   Size       State       Source      │</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            ││3c59x                                                           Not loaded  In-tree     │</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         ││3w_9xxx                                                         Not loaded  In-tree     │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││3w_sas                                                          Not loaded  In-tree     │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││3w_xxxx                                                         Not loaded  In-tree     │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││6lowpan                                                         Not loaded  In-tree     │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││8021q                                                           Not loaded  In-tree     │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││8139cp                                                          Not loaded  In-tree     │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││8139too                                                         Not loaded  In-tree     │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││8250                                                            Built-in    In-tree     │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││8250_base                                                       Built-in    In-tree     │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││8250_dfl                                                        Not loaded  In-tree     │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_dw                                                         Built-in    In-tree     │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_exar                                                       Not loaded  In-tree     │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_lpss                                                       Not loaded  In-tree     │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_mid                                                        Built-in    In-tree     │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_pci                                                        Built-in    In-tree     │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_pci1xxxx                                                   Built-in    In-tree     │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_pericom                                                    Built-in    In-tree     │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8250_rt288x                                                     Built-in    In-tree     │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││8390                                                            Not loaded  In-tree     │</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││842                                                             Built-in    In-tree     │</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││842_compress                                                    Built-in    In-tree     │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">Enter details  l loaded only  r reload  / filter                           CPU 8%  MEM 12.8 GB  Up 0:04:45:07</text>
+</g>
+<g class="s" style="animation-delay:21.0s">
+<text class="t" x="20" y="52">7/8 · Disk Space</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ All Disks — 3 mounted filesystems (3) ─────────────────────────────────────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Mount               Type     Usage                                                      │</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││/etc                btrfs    1.0 TB of 1.8 TB used, 791 GB free   ███████████░░░░░░░░░  │</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      ││/boot               ext4     608 MB of 1.9 GB used, 1.3 GB free   ██████░░░░░░░░░░░░░░  │</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      ││/boot/efi           vfat     13.2 MB of 599 MB used, 586 MB free  ░░░░░░░░░░░░░░░░░░░░  │</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            │┌ Scan ──────────────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         ││Press Enter to measure the selected disk, or c to choose a folder.                      │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││                                                                                        │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  │┌ By category ─────────────────────────────────────────┐┌ Largest Types (v: switch) (0) ─┐</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││Media         ░░░░░░░░░░░░░░░░░░░░░░░░   0.0%  0 B    ││Name                       Size │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││Documents     ░░░░░░░░░░░░░░░░░░░░░░░░   0.0%  0 B    ││                                │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││Archives      ░░░░░░░░░░░░░░░░░░░░░░░░   0.0%  0 B    ││                                │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││Applications  ░░░░░░░░░░░░░░░░░░░░░░░░   0.0%  0 B    ││                                │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││Other         ░░░░░░░░░░░░░░░░░░░░░░░░   0.0%  0 B    ││                                │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││                                                      ││                                │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                      ││                                │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└──────────────────────────────────────────────────────┘└────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">Enter scan mount  c choose folder  Space pause  x stop  v view             CPU 5%  MEM 12.8 GB  Up 0:04:45:08</text>
+</g>
+<g class="s" style="animation-delay:24.5s">
+<text class="t" x="20" y="52">8/8 · Benchmarks</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Benchmark progress — Ready ────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││                                           0%                                           │</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      │┌ Results ───────────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      ││Score 251                                                                               │</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││CPU single core           1150.2 Mops/sec                                               │</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            ││CPU all cores             8.2 Gop/sec                                                   │</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         ││Disk read                 13223.1 MB/sec                                                │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││Disk write                2769.3 MB/sec                                                 │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││Internet download         40.1 Mb/s                                                     │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││Internet upload           4.2 Mb/s                                                      │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││GPU compute (FP32)        16704.4 GFLOPS — NVIDIA GeForce RTX 3070 Laptop GPU           │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││GPU memory copy           417.1 GB/sec                                                  │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││Test folder               /tmp                                                          │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││Score is baselined to 100 for this program&#x27;s own reference figures; compare only between│</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         │┌ Benchmark history (5) ─────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││When   Score  1 core       All cores   Disk read    Disk write  GPU          Download   │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││2026-1 251    1150.2 M     8.2 G       13223.1 MB   2769.3 MB   16704.4 GF   40.1 Mb    │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││2026-1 264    —            —           —            —           16719.1 GF   —          │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││2026-1        —            —           —            —           —            5.9 Mb     │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││2026-1 397    —            —           11292.7 MB   2516.7 MB   —            —          │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││2026-1 484    3269.6 M     38.6 G      —            —           —            —          │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                                                        │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                                                        │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                                                        │</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                                                        │</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││                                                                                        │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="569" textLength="916" lengthAdjust="spacing" xml:space="preserve">a all  c cpu  d disk  g gpu  i internet  f folder  C clear  Esc cancel    CPU 10%  MEM 12.8 GB  Up 0:04:45:09</text>
+</g>
+</svg>

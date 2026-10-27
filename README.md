@@ -1,7 +1,23 @@
 # RustyTM
 
+[![License: MIT](https://img.shields.io/github/license/hansipie/RustyTM?color=blue)](LICENSE)
+[![Language: Rust](https://img.shields.io/badge/language-Rust-dea584?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![Rust edition 2021](https://img.shields.io/badge/edition-2021-orange?logo=rust&logoColor=white)](Cargo.toml)
+[![Version](https://img.shields.io/github/v/release/hansipie/RustyTM?display_name=tag&sort=semver)](https://github.com/hansipie/RustyTM/releases)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational?logo=linux&logoColor=white)](#)
+[![TUI: ratatui](https://img.shields.io/badge/TUI-ratatui-5c6bc0)](https://ratatui.rs)
+[![Last commit](https://img.shields.io/github/last-commit/hansipie/RustyTM)](https://github.com/hansipie/RustyTM/commits/main)
+[![Code size](https://img.shields.io/github/languages/code-size/hansipie/RustyTM)](https://github.com/hansipie/RustyTM)
+[![Stars](https://img.shields.io/github/stars/hansipie/RustyTM?style=flat)](https://github.com/hansipie/RustyTM/stargazers)
+
+<p align="center">
+  <img src="docs/slideshow.svg" alt="RustyTM slideshow: Summary, Processes, Performance, System Info, Power &amp; Freq, Drivers, Disk Space, Benchmarks" width="900">
+  <br>
+  <sub>Slideshow of the main pages (rendered with <code>rustytm --dump=&lt;page&gt;</code>)</sub>
+</p>
+
 Task manager for Linux, written in Rust (terminal UI, ratatui). Original implementation: every
-collector reads `/proc`, `/sys`, `systemctl`, `loginctl`, `nvidia-smi` directly. No licence, no
+collector reads `/proc`, `/sys`, `systemctl`, `loginctl`, `nvidia-smi` directly. No licence key, no
 feature gating: all pages are enabled.
 
     cargo build --release
