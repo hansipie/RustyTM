@@ -20,8 +20,9 @@ USAGE: rustytm [OPTIONS]
        rustytm update       check crates.io and reinstall the latest version (via cargo)
 
   --page=<name>        open on a page (summary, processes, performance, app-history, startup,
-                       users, services, system-info, power-freq, flight-recorder, connections,
-                       installed-apps, drivers, disk-space, benchmarks, settings)
+                       users, services, system-info, power-freq, thermals, flight-recorder,
+                       connections, installed-apps, drivers, disk-space, benchmarks, disk-health,
+                       settings)
   --dump=<page>        render one page as plain text (80x40..) and exit; no terminal needed
   --size=WxH           size used by --dump (default 150x45)
   --self-test          collect everything once, render every page headlessly, print a report
@@ -197,6 +198,7 @@ fn self_test(w: u16, h: u16) {
             P_HEALTH => a.health.as_ref().map(|h| format!("{} disks", h.disks.len())).unwrap_or_default(),
             P_SYSINFO => format!("{} sections", a.sysinfo.len()),
             P_POWER => format!("{} sensors", a.sensors.len()),
+            P_THERMAL => format!("{} temperature sensors", a.thermals().len()),
             _ => format!("{rows} rows"),
         };
         check(&format!("page {}", PAGES[page]), n_nonblank > 3, format!("rendered {n_nonblank} non-empty lines; {detail}"));

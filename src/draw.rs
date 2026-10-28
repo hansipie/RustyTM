@@ -6,8 +6,9 @@ use crate::diskscan::CATEGORIES;
 use crate::util::*;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Gauge, Paragraph, Row, Sparkline, Table, Wrap};
+use ratatui::widgets::{Axis, Block, BorderType, Borders, Chart, Clear, Dataset, Gauge, GraphType, Paragraph, Row, Sparkline, Table, Wrap};
 use ratatui::Frame;
 use std::collections::VecDeque;
 use std::io::Write;
@@ -65,6 +66,12 @@ fn line(label: &str, value: String) -> Line<'static> {
 
 pub fn draw(f: &mut Frame, a: &mut App) {
     let area = f.area();
+    // full-screen sensor graph: no sidebar, no status bar
+    if a.page == P_THERMAL && a.thermal_full {
+        thermal_fullscreen(f, area, a);
+        overlays(f, area, a);
+        return;
+    }
     let rows = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(3), Constraint::Length(if a.s.status_bar { 1 } else { 0 })]).split(area);
     let cols = if a.s.sidebar {
         Layout::default().direction(Direction::Horizontal).constraints([Constraint::Length(20), Constraint::Min(20)]).split(rows[0])
@@ -85,6 +92,7 @@ pub fn draw(f: &mut Frame, a: &mut App) {
         P_SERVICES => services(f, c, a),
         P_SYSINFO => sysinfo(f, c, a),
         P_POWER => power(f, c, a),
+        P_THERMAL => thermals(f, c, a),
         P_RECORDER => recorder(f, c, a),
         P_CONN => connections(f, c, a),
         P_APPS => installed(f, c, a),
@@ -122,6 +130,7 @@ fn hints(a: &App) -> &'static str {
         P_USERS => "l lock  d disconnect  M manage accounts  r reload",
         P_SERVICES => "s start  x stop  R restart  e enable/disable  g process  r reload  / filter",
         P_SYSINFO => "↑↓ scroll  E export  r reload",
+        P_THERMAL => "↑↓ sensor  v dashboard/single  f/Enter full screen  / filter",
         P_RECORDER => "r record/stop  s save  d discard  Enter replay  o open file  (replay: Space play  ,/. step  x close)",
         P_CONN => "a all  l listening  p public  t IPC  g process  r reload  / filter",
         P_APPS => "u uninstall  p packages without desktop entries  r reload  / filter",
@@ -628,6 +637,149 @@ fn power(f: &mut Frame, area: Rect, a: &mut App) {
     f.render_widget(Paragraph::new(l).block(block("Source access", a)), v[1]);
 }
 
+// ───────────── thermals ─────────────
+
+/// Min, max and average of a temperature history (tenths of °C), in °C.
+fn temp_stats(h: &VecDeque<u64>) -> Option<(f64, f64, f64)> {
+    if h.is_empty() {
+        return None;
+    }
+    let (mut lo, mut hi, mut sum) = (f64::MAX, f64::MIN, 0.0);
+    for &v in h {
+        let c = v as f64 / 10.0;
+        lo = lo.min(c);
+        hi = hi.max(c);
+        sum += c;
+    }
+    Some((lo, hi, sum / h.len() as f64))
+}
+
+fn temp_stats_str(a: &App, h: &VecDeque<u64>) -> String {
+    match temp_stats(h) {
+        Some((lo, hi, avg)) => format!("min {}  max {}  avg {}", a.s.temp(lo), a.s.temp(hi), a.s.temp(avg)),
+        None => "no samples yet".into(),
+    }
+}
+
+fn temp_hist<'a>(a: &'a App, t: &Thermal) -> &'a VecDeque<u64> {
+    static EMPTY: VecDeque<u64> = VecDeque::new();
+    a.dh.get(&t.key).unwrap_or(&EMPTY)
+}
+
+/// Line graph of one sensor's history in the chosen unit, newest sample at the right edge.
+/// `axes` adds time and temperature scales (the dashboard tiles are too small for them).
+fn temp_chart(f: &mut Frame, area: Rect, a: &App, t: &Thermal, blk: Block, axes: bool) {
+    let h = temp_hist(a, t);
+    let start = HIST_LEN.saturating_sub(h.len());
+    let pts: Vec<(f64, f64)> = h.iter().enumerate().map(|(i, &v)| ((start + i) as f64, a.s.temp_value(v as f64 / 10.0))).collect();
+    let (lo, hi) = pts.iter().fold((f64::MAX, f64::MIN), |m, p| (m.0.min(p.1), m.1.max(p.1)));
+    let (lo, hi) = if pts.is_empty() { (0.0, 100.0) } else { (lo, hi) };
+    // at least 10 degrees of range, so sensor noise does not look like a spike
+    let pad = ((10.0 - (hi - lo)) / 2.0).max(0.0) + 1.0;
+    let (lo, hi) = ((lo - pad).floor(), (hi + pad).ceil());
+    let ds = Dataset::default().marker(Marker::Braille).graph_type(GraphType::Line).style(Style::new().fg(level_color(t.celsius as f32))).data(&pts);
+    let mut x = Axis::default().bounds([0.0, (HIST_LEN - 1) as f64]);
+    let mut y = Axis::default().bounds([lo, hi]);
+    if axes {
+        let gray = Style::new().fg(Color::DarkGray);
+        let secs = HIST_LEN as u64 * a.s.refresh_ms.max(250) / 1000;
+        x = x.style(gray).labels(vec![format!("-{secs}s"), format!("-{}s", secs / 2), "now".to_string()]);
+        let u = a.s.temp_unit();
+        y = y.style(gray).labels(vec![format!("{lo:.0}{u}"), format!("{:.0}{u}", (lo + hi) / 2.0), format!("{hi:.0}{u}")]);
+    }
+    f.render_widget(Chart::new(vec![ds]).block(blk).x_axis(x).y_axis(y), area);
+}
+
+fn no_thermals(f: &mut Frame, area: Rect, a: &App, title: String) {
+    f.render_widget(Paragraph::new("No temperature sensors found (hwmon, ACPI thermal zones, GPU telemetry).").block(block(title, a)), area);
+}
+
+fn thermals(f: &mut Frame, area: Rect, a: &mut App) {
+    let ts = a.thermal_view();
+    a.sel[P_THERMAL] = a.sel[P_THERMAL].min(ts.len().saturating_sub(1));
+    let mode = if a.thermal_mode == ThermalMode::Grid { "dashboard" } else { "single sensor" };
+    let hottest = ts.iter().max_by(|x, y| x.celsius.partial_cmp(&y.celsius).unwrap_or(std::cmp::Ordering::Equal)).map(|t| format!(" — hottest {} {}", t.name, a.s.temp(t.celsius))).unwrap_or_default();
+    let title = page_title(a, P_THERMAL, &format!("{mode}{hottest}"));
+    if ts.is_empty() {
+        return no_thermals(f, area, a, title);
+    }
+    match a.thermal_mode {
+        ThermalMode::Grid => thermal_grid(f, area, a, &ts, title),
+        ThermalMode::Single => thermal_single(f, area, a, &ts, title),
+    }
+}
+
+/// One graph tile per sensor, scrolled by whole rows to keep the selected tile in view.
+fn thermal_grid(f: &mut Frame, area: Rect, a: &mut App, ts: &[Thermal], title: String) {
+    let sel = a.sel[P_THERMAL];
+    let outer = block(title, a).title_bottom(Line::from(format!(" {}/{} ", sel + 1, ts.len())).right_aligned());
+    let inner = outer.inner(area);
+    f.render_widget(outer, area);
+    let cols = ((inner.width / 38) as usize).clamp(1, ts.len());
+    let rows = ts.len().div_ceil(cols);
+    let vis = ((inner.height / 7) as usize).clamp(1, rows);
+    let off = &mut a.offset[P_THERMAL];
+    let srow = sel / cols;
+    if srow < *off {
+        *off = srow;
+    }
+    if srow >= *off + vis {
+        *off = srow + 1 - vis;
+    }
+    *off = (*off).min(rows - vis);
+    let off = *off;
+    let lines = Layout::default().direction(Direction::Vertical).constraints(vec![Constraint::Ratio(1, vis as u32); vis]).split(inner);
+    for (r, rr) in lines.iter().enumerate() {
+        let cells = Layout::default().direction(Direction::Horizontal).constraints(vec![Constraint::Ratio(1, cols as u32); cols]).split(*rr);
+        for (c, cell) in cells.iter().enumerate() {
+            let i = (off + r) * cols + c;
+            let Some(t) = ts.get(i) else { break };
+            let cur = format!(" {} ", a.s.temp(t.celsius));
+            // shorten the name so the current reading always stays visible
+            let room = (cell.width as usize).saturating_sub(cur.chars().count() + 5);
+            let name = if t.name.chars().count() > room { format!("{}…", t.name.chars().take(room.saturating_sub(1)).collect::<String>()) } else { t.name.clone() };
+            let now = Line::from(Span::styled(cur, Style::new().fg(level_color(t.celsius as f32)).add_modifier(Modifier::BOLD))).right_aligned();
+            let mut b = Block::default().borders(Borders::ALL).title(format!(" {name} ")).title(now).title_bottom(Line::from(Span::styled(format!(" {} ", temp_stats_str(a, temp_hist(a, t))), Style::new().fg(Color::DarkGray))));
+            if i == sel {
+                b = b.border_type(BorderType::Thick).border_style(Style::new().fg(accent(a)).add_modifier(Modifier::BOLD));
+            }
+            temp_chart(f, *cell, a, t, b, false);
+        }
+    }
+}
+
+/// Sensor list on the left, the selected sensor's graph and statistics on the right.
+fn thermal_single(f: &mut Frame, area: Rect, a: &mut App, ts: &[Thermal], title: String) {
+    let w = ts.iter().map(|t| t.name.chars().count()).max().unwrap_or(0) as u16 + 13;
+    let cols = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Length(w.clamp(26, 50)), Constraint::Min(30)]).split(area);
+    let sel = a.sel[P_THERMAL];
+    let rows: Vec<Vec<String>> = ts.iter().map(|t| vec![t.name.clone(), a.s.temp(t.celsius)]).collect();
+    let mut off = a.offset[P_THERMAL];
+    table(f, cols[0], "Sensors".into(), &["Sensor", "Now"], &[Constraint::Min(14), Constraint::Length(7)], rows, sel, &mut off, a);
+    a.offset[P_THERMAL] = off;
+    let t = &ts[sel];
+    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(8), Constraint::Length(8)]).split(cols[1]);
+    temp_chart(f, v[0], a, t, block(title, a), true);
+    let h = temp_hist(a, t);
+    let mut l = vec![line("Sensor", t.label.clone()), line("Device", t.device.clone()), line("Current", a.s.temp(t.celsius))];
+    if let Some((lo, hi, avg)) = temp_stats(h) {
+        l.push(line("Minimum / maximum", format!("{} / {}", a.s.temp(lo), a.s.temp(hi))));
+        l.push(line("Average", a.s.temp(avg)));
+    }
+    l.push(line("Window", format!("{} samples, one every {} ms", h.len(), a.s.refresh_ms)));
+    f.render_widget(Paragraph::new(l).block(block(format!("{}  (v: dashboard, f: full screen)", t.name), a)), v[1]);
+}
+
+fn thermal_fullscreen(f: &mut Frame, area: Rect, a: &mut App) {
+    let ts = a.thermal_view();
+    a.sel[P_THERMAL] = a.sel[P_THERMAL].min(ts.len().saturating_sub(1));
+    let Some(t) = ts.get(a.sel[P_THERMAL]) else {
+        return no_thermals(f, area, a, "Thermals — Esc to leave full screen".into());
+    };
+    let title = format!("{} — {}   {}   [{}/{}]   ↑↓ ←→ sensor  f/Esc leave full screen", t.name, a.s.temp(t.celsius), temp_stats_str(a, temp_hist(a, t)), a.sel[P_THERMAL] + 1, ts.len());
+    temp_chart(f, area, a, t, block(title, a), true);
+}
+
 fn connections(f: &mut Frame, area: Rect, a: &mut App) {
     let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(6), Constraint::Length(7)]).split(area);
     let cv = a.scope_conns();
@@ -1009,7 +1161,7 @@ fn overlays(f: &mut Frame, area: Rect, a: &App) {
         f.render_widget(Paragraph::new(vec![Line::from(text), Line::from(""), Line::from("y / Enter = yes     any other key = no")]).wrap(Wrap { trim: true }).block(block("Confirm", a)), r);
     }
     if a.help {
-        let text = "Pages:   Tab / Shift-Tab / [ ] / ← →\nQuit:    q or Ctrl-C        Filter: /  (Esc clears)\nSidebar: b                   Status bar: B\nRun new task: N              Help: ?\n\nProcesses:  ↑↓ PgUp PgDn  Enter details  x terminate (SIGTERM)  K kill (SIGKILL)\n            X terminate/force the whole tree (x then X)  p suspend  c continue\n            s send signal  n nice  a affinity  t tree  Space fold  E fold all\n            e show exited  v values/percent  < > sort column  o order  C copy cmdline\n            Y copy name  W search online  m write a sample report\n\nFlight Recorder:  r record  s save  d discard  Enter replay  Space play/pause  ,/. step\n                  PgUp/PgDn ±30 samples  x close replay\n\nDisk space:  Enter measure selected disk  c choose folder to measure\n\nBenchmarks:  a all  c cpu  d disk  g gpu  i internet  f folder  C clear history";
+        let text = "Pages:   Tab / Shift-Tab / [ ] / ← →\nQuit:    q or Ctrl-C        Filter: /  (Esc clears)\nSidebar: b                   Status bar: B\nRun new task: N              Help: ?\n\nProcesses:  ↑↓ PgUp PgDn  Enter details  x terminate (SIGTERM)  K kill (SIGKILL)\n            X terminate/force the whole tree (x then X)  p suspend  c continue\n            s send signal  n nice  a affinity  t tree  Space fold  E fold all\n            e show exited  v values/percent  < > sort column  o order  C copy cmdline\n            Y copy name  W search online  m write a sample report\n\nThermals:  ↑↓ / n p cycle sensors  v dashboard / single sensor  f or Enter full screen\n          (full screen: ←→ also cycle, Esc or f to leave)\n\nFlight Recorder:  r record  s save  d discard  Enter replay  Space play/pause  ,/. step\n                  PgUp/PgDn ±30 samples  x close replay\n\nDisk space:  Enter measure selected disk  c choose folder to measure\n\nBenchmarks:  a all  c cpu  d disk  g gpu  i internet  f folder  C clear history";
         let w = text.lines().map(|l| l.chars().count()).max().unwrap_or(0) as u16 + 2;
         let r = centered(area, w, text.lines().count() as u16 + 2);
         f.render_widget(Clear, r);

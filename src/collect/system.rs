@@ -640,7 +640,10 @@ pub fn sensors(rapl: &mut Rapl, logical: usize, gpu_list: &[GpuStat]) -> SensorS
         }
     }
     if let Ok(rd) = std::fs::read_dir("/sys/class/thermal") {
-        for e in rd.flatten() {
+        // stable order: the Thermals page keys its histories on it
+        let mut zones: Vec<_> = rd.flatten().collect();
+        zones.sort_by_key(|e| e.file_name());
+        for e in zones {
             let n = e.file_name().to_string_lossy().into_owned();
             if n.starts_with("thermal_zone") {
                 let p = e.path().to_string_lossy().into_owned();

@@ -79,6 +79,15 @@ impl Settings {
             format!("{c:.0}°C")
         }
     }
+
+    /// A Celsius reading in the chosen unit, for graph scales.
+    pub fn temp_value(&self, c: f64) -> f64 {
+        if self.fahrenheit { c * 9.0 / 5.0 + 32.0 } else { c }
+    }
+
+    pub fn temp_unit(&self) -> &'static str {
+        if self.fahrenheit { "°F" } else { "°C" }
+    }
 }
 
 pub fn reset() -> String {

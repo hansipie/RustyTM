@@ -13,9 +13,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-pub const PAGES: [&str; 17] = [
-    "Summary", "Processes", "Performance", "App history", "Startup apps", "Users", "Services", "System Info", "Power & Freq", "Flight Recorder", "Connections", "Installed Apps", "Drivers", "Disk Space", "Benchmarks", "Disk Health", "Settings",
+pub const PAGES: [&str; 18] = [
+    "Summary", "Processes", "Performance", "App history", "Startup apps", "Users", "Services", "System Info", "Power & Freq", "Thermals", "Flight Recorder", "Connections", "Installed Apps", "Drivers", "Disk Space", "Benchmarks", "Disk Health", "Settings",
 ];
+pub const N_PAGES: usize = PAGES.len();
 pub const P_SUMMARY: usize = 0;
 pub const P_PROCESSES: usize = 1;
 pub const P_PERF: usize = 2;
@@ -25,14 +26,15 @@ pub const P_USERS: usize = 5;
 pub const P_SERVICES: usize = 6;
 pub const P_SYSINFO: usize = 7;
 pub const P_POWER: usize = 8;
-pub const P_RECORDER: usize = 9;
-pub const P_CONN: usize = 10;
-pub const P_APPS: usize = 11;
-pub const P_DRIVERS: usize = 12;
-pub const P_DISK: usize = 13;
-pub const P_BENCH: usize = 14;
-pub const P_HEALTH: usize = 15;
-pub const P_SETTINGS: usize = 16;
+pub const P_THERMAL: usize = 9;
+pub const P_RECORDER: usize = 10;
+pub const P_CONN: usize = 11;
+pub const P_APPS: usize = 12;
+pub const P_DRIVERS: usize = 13;
+pub const P_DISK: usize = 14;
+pub const P_BENCH: usize = 15;
+pub const P_HEALTH: usize = 16;
+pub const P_SETTINGS: usize = 17;
 
 pub const HIST_LEN: usize = 120;
 pub const PROC_COLS: [&str; 9] = ["Name", "PID", "CPU", "Memory", "Disk read", "Disk write", "User", "Status", "Threads"];
@@ -40,9 +42,10 @@ pub const PROC_COLS: [&str; 9] = ["Name", "PID", "CPU", "Memory", "Disk read", "
 pub fn page_from_name(n: &str) -> Option<usize> {
     let n = n.to_lowercase().replace(['-', '_', ' ', '&'], "");
     let alias: &[(&str, usize)] = &[
-        ("summary", 0), ("processes", 1), ("process", 1), ("performance", 2), ("apphistory", 3), ("history", 3), ("startup", 4), ("startupapps", 4), ("users", 5), ("services", 6),
-        ("sysinfo", 7), ("systeminfo", 7), ("powerfreq", 8), ("powerandfreq", 8), ("power", 8), ("recorder", 9), ("flightrecorder", 9), ("flight", 9), ("connections", 10), ("networkconnections", 10),
-        ("installedapps", 11), ("apps", 11), ("drivers", 12), ("kernelmodules", 12), ("diskspace", 13), ("disk", 13), ("benchmarks", 14), ("benchmark", 14), ("diskhealth", 15), ("health", 15), ("smart", 15), ("settings", 16),
+        ("summary", P_SUMMARY), ("processes", P_PROCESSES), ("process", P_PROCESSES), ("performance", P_PERF), ("apphistory", P_APPHIST), ("history", P_APPHIST), ("startup", P_STARTUP), ("startupapps", P_STARTUP), ("users", P_USERS), ("services", P_SERVICES),
+        ("sysinfo", P_SYSINFO), ("systeminfo", P_SYSINFO), ("powerfreq", P_POWER), ("powerandfreq", P_POWER), ("power", P_POWER), ("thermals", P_THERMAL), ("thermal", P_THERMAL), ("temperatures", P_THERMAL), ("temps", P_THERMAL),
+        ("recorder", P_RECORDER), ("flightrecorder", P_RECORDER), ("flight", P_RECORDER), ("connections", P_CONN), ("networkconnections", P_CONN),
+        ("installedapps", P_APPS), ("apps", P_APPS), ("drivers", P_DRIVERS), ("kernelmodules", P_DRIVERS), ("diskspace", P_DISK), ("disk", P_DISK), ("benchmarks", P_BENCH), ("benchmark", P_BENCH), ("diskhealth", P_HEALTH), ("health", P_HEALTH), ("smart", P_HEALTH), ("settings", P_SETTINGS),
     ];
     alias.iter().find(|(a, _)| *a == n).map(|x| x.1)
 }
@@ -114,6 +117,24 @@ pub enum CpuGraph {
     Classes,
 }
 
+/// Thermals page layout: one graph per sensor, or the selected sensor with its details.
+#[derive(Default, Clone, Copy, PartialEq)]
+pub enum ThermalMode {
+    #[default]
+    Grid,
+    Single,
+}
+
+/// One temperature sensor as shown on the Thermals page.
+pub struct Thermal {
+    /// history key in `App::dh` (tenths of °C)
+    pub key: String,
+    pub name: String,
+    pub device: String,
+    pub label: String,
+    pub celsius: f64,
+}
+
 pub struct App {
     pub s: Settings,
     pub page: usize,
@@ -125,9 +146,9 @@ pub struct App {
     pub confirm: Option<Confirm>,
     pub overlay: Option<Overlay>,
     pub help: bool,
-    pub sel: [usize; 17],
-    pub filter: [String; 17],
-    pub offset: [usize; 17],
+    pub sel: [usize; N_PAGES],
+    pub filter: [String; N_PAGES],
+    pub offset: [usize; N_PAGES],
 
     // sampled data
     pub cpu_static: CpuStatic,
@@ -154,6 +175,10 @@ pub struct App {
     pub perf_dev: usize,
     pub cpu_graph: CpuGraph,
     pub show_kernel: bool,
+
+    // thermals
+    pub thermal_mode: ThermalMode,
+    pub thermal_full: bool,
 
     // processes
     pub proc_sel: i32,
@@ -238,9 +263,9 @@ impl App {
             confirm: None,
             overlay: None,
             help: false,
-            sel: [0; 17],
+            sel: [0; N_PAGES],
             filter: Default::default(),
-            offset: [0; 17],
+            offset: [0; N_PAGES],
             cpu_static,
             cpu_sampler: CpuSampler::default(),
             proc_sampler: ProcSampler::new(),
@@ -265,6 +290,8 @@ impl App {
             perf_dev: 0,
             cpu_graph: CpuGraph::Overall,
             show_kernel: false,
+            thermal_mode: ThermalMode::Grid,
+            thermal_full: false,
             proc_sel: 0,
             proc_values: true,
             collapsed,
@@ -377,6 +404,9 @@ impl App {
         for (i, g) in self.gpu_now.iter().enumerate() {
             dh.push((format!("gpu:{i}"), g.util.unwrap_or(0.0).round() as u64));
             dh.push((format!("gmem:{i}"), match (g.mem_used, g.mem_total) { (Some(u), Some(t)) if t > 0 => u * 100 / t, _ => 0 }));
+        }
+        for t in self.thermals() {
+            dh.push((t.key, (t.celsius.max(0.0) * 10.0).round() as u64));
         }
         for (k, v) in dh {
             push(self.dh.entry(k).or_default(), v);
@@ -583,6 +613,7 @@ impl App {
 
     pub fn goto(&mut self, p: usize) {
         self.page = p % PAGES.len();
+        self.thermal_full = false;
         self.enter_page();
     }
 
@@ -694,6 +725,26 @@ impl App {
         self.sensors.iter().filter(|s| self.matches(P_POWER, &[&s.label, &s.device, s.group])).collect()
     }
 
+    /// Every temperature sensor, in collection order. Sensors sharing a device and label
+    /// (two NVMe drives, several ACPI zones) get a #n suffix so each keeps its own history.
+    pub fn thermals(&self) -> Vec<Thermal> {
+        let mut seen: HashMap<String, usize> = HashMap::new();
+        self.sensors
+            .iter()
+            .filter(|s| s.group == "Temperatures")
+            .map(|s| {
+                let n = seen.entry(format!("{}/{}", s.device, s.label)).or_default();
+                *n += 1;
+                let dev = if *n > 1 { format!("{} #{n}", s.device) } else { s.device.clone() };
+                Thermal { key: format!("temp:{dev}/{}", s.label), name: format!("{dev} / {}", s.label), device: dev, label: s.label.clone(), celsius: s.value }
+            })
+            .collect()
+    }
+
+    pub fn thermal_view(&self) -> Vec<Thermal> {
+        self.thermals().into_iter().filter(|t| self.matches(P_THERMAL, &[&t.name])).collect()
+    }
+
     pub fn app_hist_view(&self) -> Vec<(&String, &(f64, u64, u64))> {
         let mut v: Vec<_> = self.app_hist.iter().filter(|(k, _)| self.matches(P_APPHIST, &[k])).collect();
         v.sort_by(|a, b| b.1 .0.partial_cmp(&a.1 .0).unwrap_or(std::cmp::Ordering::Equal));
@@ -708,6 +759,7 @@ impl App {
             P_USERS => self.users_view().len(),
             P_SERVICES => self.service_view().len(),
             P_POWER => self.power_view().len(),
+            P_THERMAL => self.thermal_view().len(),
             P_CONN => self.scope_conns().len(),
             P_APPS => self.app_view().len(),
             P_DRIVERS => self.module_view().len(),
@@ -749,6 +801,12 @@ impl App {
             return;
         }
         let replaying = self.replay.is_some() && self.page == P_RECORDER;
+        // full-screen graph: ← → cycle sensors instead of pages, Esc leaves full screen
+        let full = self.page == P_THERMAL && self.thermal_full;
+        if full && k.code == KeyCode::Esc {
+            self.thermal_full = false;
+            return;
+        }
         match k.code {
             KeyCode::Char('q') => {
                 if self.rec.as_ref().map_or(false, |r| r.saved.is_none() && !r.trace.samples.is_empty()) {
@@ -764,8 +822,8 @@ impl App {
             }
             KeyCode::Tab | KeyCode::Char(']') => return self.goto(self.page + 1),
             KeyCode::BackTab | KeyCode::Char('[') => return self.goto(self.page + PAGES.len() - 1),
-            KeyCode::Right if !replaying => return self.goto(self.page + 1),
-            KeyCode::Left if !replaying => return self.goto(self.page + PAGES.len() - 1),
+            KeyCode::Right if !replaying && !full => return self.goto(self.page + 1),
+            KeyCode::Left if !replaying && !full => return self.goto(self.page + PAGES.len() - 1),
             KeyCode::Char('b') => {
                 self.s.sidebar = !self.s.sidebar;
                 return self.save_settings();
@@ -790,7 +848,7 @@ impl App {
         }
         // list navigation
         let n = self.row_count(self.page);
-        if self.page != P_PROCESSES && !(self.page == P_SYSINFO) {
+        if !matches!(self.page, P_PROCESSES | P_SYSINFO | P_THERMAL) {
             let sel = &mut self.sel[self.page];
             let sel_before = *sel;
             match k.code {
@@ -810,6 +868,7 @@ impl App {
         match self.page {
             P_PROCESSES => self.key_processes(k),
             P_PERF => self.key_perf(k),
+            P_THERMAL => self.key_thermal(k),
             P_STARTUP => self.key_startup(k),
             P_USERS => self.key_users(k),
             P_SERVICES => self.key_services(k),
@@ -1144,6 +1203,27 @@ impl App {
                 self.s.combined_gpus = self.s.combined_disks;
                 self.save_settings();
             }
+            _ => {}
+        }
+    }
+
+    fn key_thermal(&mut self, k: KeyEvent) {
+        let n = self.row_count(P_THERMAL);
+        let sel = &mut self.sel[P_THERMAL];
+        *sel = (*sel).min(n.saturating_sub(1));
+        // the selection wraps around so the sensors can be cycled through
+        match k.code {
+            KeyCode::Down | KeyCode::Right | KeyCode::Char('j') | KeyCode::Char('n') if n > 0 => *sel = (*sel + 1) % n,
+            KeyCode::Up | KeyCode::Left | KeyCode::Char('k') | KeyCode::Char('p') if n > 0 => *sel = (*sel + n - 1) % n,
+            KeyCode::Home => *sel = 0,
+            KeyCode::End => *sel = n.saturating_sub(1),
+            KeyCode::Char('v') => {
+                self.thermal_mode = match self.thermal_mode {
+                    ThermalMode::Grid => ThermalMode::Single,
+                    ThermalMode::Single => ThermalMode::Grid,
+                }
+            }
+            KeyCode::Char('f') | KeyCode::Enter => self.thermal_full = !self.thermal_full,
             _ => {}
         }
     }

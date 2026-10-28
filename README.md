@@ -37,7 +37,8 @@ Or from source:
 
 Pages: Summary, Processes (tree, signals, nice, affinity, details), Performance (CPU/memory/disks/
 network/GPU), App history, Startup apps, Users, Services, System Info (export; memory and Wi-Fi details), Power & Freq,
-Flight Recorder (record, save, validate, replay), Connections, Installed Apps (uninstall with `u`), Drivers (kernel
+Thermals (one graph per temperature sensor: dashboard or single-sensor view, `↑↓` to cycle, `v` to switch, `f` for
+full screen), Flight Recorder (record, save, validate, replay), Connections, Installed Apps (uninstall with `u`), Drivers (kernel
 modules), Disk Space (scanner), Benchmarks (CPU, disk, GPU, internet), Disk Health (SMART), Settings. Press `?` for keys.
 
 The GPU benchmark (FP32 compute and memory copy bandwidth) uses OpenCL, loaded at run time with
