@@ -1,14 +1,14 @@
 use crate::app::*;
 use crate::bench::BenchResult;
+use crate::charts::{self, Chart, Kind, Palette};
 use crate::collect::proc::Proc;
 use crate::collect::system::*;
 use crate::diskscan::CATEGORIES;
 use crate::util::*;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Axis, Block, BorderType, Borders, Chart, Clear, Dataset, Gauge, GraphType, Paragraph, Row, Sparkline, Table, Wrap};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Row, Table, Wrap};
 use ratatui::Frame;
 use std::collections::VecDeque;
 use std::io::Write;
@@ -33,31 +33,34 @@ fn accent(a: &App) -> Color {
     if a.s.light_theme { Color::Blue } else { Color::Cyan }
 }
 
-fn level_color(p: f32) -> Color {
-    if p >= 85.0 { Color::Red } else if p >= 60.0 { Color::Yellow } else { Color::Green }
-}
-
-pub fn bar(p: f32, w: usize) -> String {
-    let p = p.clamp(0.0, 100.0);
-    let n = ((p / 100.0) * w as f32).round() as usize;
-    format!("{}{}", "█".repeat(n.min(w)), "░".repeat(w - n.min(w)))
+fn level_color(a: &App, p: f32) -> Color {
+    charts::level(a, p as f64)
 }
 
 fn block<'a>(title: impl Into<String>, a: &App) -> Block<'a> {
     Block::default().borders(Borders::ALL).title(Span::styled(format!(" {} ", title.into()), Style::new().fg(accent(a)).add_modifier(Modifier::BOLD)))
 }
 
-fn vec_of(h: &VecDeque<u64>) -> Vec<u64> {
-    h.iter().copied().collect()
+/// Load chart (0–100 %) of one history, colored by level.
+fn load_chart(f: &mut Frame, area: Rect, title: String, h: &VecDeque<u64>, a: &App) {
+    Chart::new(Kind::Percent, block(title, a)).history("", h, 1.0, None).render(f, area, a);
 }
 
-fn spark(f: &mut Frame, area: Rect, title: String, data: &VecDeque<u64>, max: Option<u64>, color: Color, a: &App) {
-    let v = vec_of(data);
-    let mut sp = Sparkline::default().block(block(title, a)).data(&v).style(Style::new().fg(color));
-    if let Some(m) = max {
-        sp = sp.max(m);
+/// Element-wise sum of several histories, aligned on their newest sample.
+fn sum_hist<'a>(hs: impl Iterator<Item = &'a VecDeque<u64>>) -> Vec<f64> {
+    let mut out: Vec<f64> = Vec::new();
+    for h in hs {
+        if h.len() > out.len() {
+            let mut v = vec![0.0; h.len() - out.len()];
+            v.append(&mut out);
+            out = v;
+        }
+        let off = out.len() - h.len();
+        for (i, &x) in h.iter().enumerate() {
+            out[off + i] += x as f64;
+        }
     }
-    f.render_widget(sp, area);
+    out
 }
 
 fn line(label: &str, value: String) -> Line<'static> {
@@ -210,20 +213,21 @@ fn page_title(a: &App, page: usize, extra: &str) -> String {
 fn summary(f: &mut Frame, area: Rect, a: &App) {
     let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(7), Constraint::Length(7), Constraint::Min(5), Constraint::Length(3)]).split(area);
     let top = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Percentage(50), Constraint::Percentage(50)]).split(v[0]);
-    spark(f, top[0], format!("CPU {:.0}% — {} ({} logical)", a.cpu.overall, a.cpu_static.model, a.cpu_static.logical), &a.hist.cpu, Some(100), level_color(a.cpu.overall), a);
+    load_chart(f, top[0], format!("CPU {:.0}% — {} ({} logical)", a.cpu.overall, a.cpu_static.model, a.cpu_static.logical), &a.hist.cpu, a);
     let mp = if a.mem.total > 0 { a.mem.used as f32 / a.mem.total as f32 * 100.0 } else { 0.0 };
-    spark(f, top[1], format!("Memory {} / {} ({:.0}%)", bytes(a.mem.used as f64), bytes(a.mem.total as f64), mp), &a.hist.mem, Some(100), level_color(mp), a);
+    load_chart(f, top[1], format!("Memory {} / {} ({:.0}%)", bytes(a.mem.used as f64), bytes(a.mem.total as f64), mp), &a.hist.mem, a);
     let mid = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Percentage(34), Constraint::Percentage(33), Constraint::Percentage(33)]).split(v[1]);
     let dr: f64 = a.disks.iter().map(|d| d.read_rate).sum();
     let dw: f64 = a.disks.iter().map(|d| d.write_rate).sum();
-    spark(f, mid[0], format!("Disk R {} W {}", rate(dr), rate(dw)), &a.hist.disk, Some(100), Color::Blue, a);
+    load_chart(f, mid[0], format!("Disk {:.0}% R {} W {}", a.hist.disk.back().copied().unwrap_or(0), rate(dr), rate(dw)), &a.hist.disk, a);
     let (rx, tx) = a.nets.iter().filter(|n| n.name != "lo").fold((0.0, 0.0), |s, n| (s.0 + n.rx_rate, s.1 + n.tx_rate));
-    spark(f, mid[1], format!("Network ↓ {} ↑ {}", net_rate(rx), net_rate(tx)), &a.hist.rx, None, Color::Magenta, a);
+    let pal = Palette::of(a);
+    Chart::new(Kind::NetRate, block(format!("Network ↓ {} ↑ {}", net_rate(rx), net_rate(tx)), a)).history("↓", &a.hist.rx, 1.0, Some(pal.rx)).history("↑", &a.hist.tx, 1.0, Some(pal.tx)).render(f, mid[1], a);
     let gt = match a.gpu_now.first() {
         Some(g) => format!("GPU {:.0}% {}", g.util.unwrap_or(0.0), g.temp.map(|t| a.s.temp(t as f64)).unwrap_or_default()),
         None => "GPU (none detected)".into(),
     };
-    spark(f, mid[2], gt, &a.hist.gpu, Some(100), Color::Green, a);
+    load_chart(f, mid[2], gt, &a.hist.gpu, a);
     // top processes + system pressure
     let bot = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Min(30), Constraint::Length(36)]).split(v[2]);
     let mut top5: Vec<&Proc> = a.procs.iter().collect();
@@ -242,7 +246,7 @@ fn summary(f: &mut Frame, area: Rect, a: &App) {
     let pressure = a.cpu.overall.max((a.mem.psi_some10 * 5.0).min(100.0)).max(a.disks.iter().map(|d| d.active_pct).fold(0.0, f32::max));
     let lines = vec![
         Line::from(format!("System pressure {:>5.1}%", pressure)),
-        Line::from(Span::styled(bar(pressure, 30), Style::new().fg(level_color(pressure)))),
+        Line::from(charts::meter(a, pressure as f64, 30, None)),
         Line::from(""),
         line("Memory stall (PSI)", format!("{:.2}%", a.mem.psi_some10)),
         line("Swap in use", bytes(a.mem.swap_used as f64)),
@@ -365,7 +369,7 @@ fn performance(f: &mut Frame, area: Rect, a: &mut App) {
                 Some(Dev::Gpu(Some(g))) => (format!("{:.0}%", a.gpu_now[*g].util.unwrap_or(0.0)), a.gpu_now[*g].util.unwrap_or(0.0)),
                 _ => (String::new(), 0.0),
             };
-            let st = if i == a.perf_dev { Style::new().fg(Color::Black).bg(accent(a)) } else { Style::new().fg(level_color(p)) };
+            let st = if i == a.perf_dev { Style::new().fg(Color::Black).bg(accent(a)) } else { Style::new().fg(level_color(a, p)) };
             Line::from(Span::styled(format!(" {n:<16}{val:>4}"), st))
         })
         .collect();
@@ -389,7 +393,7 @@ fn perf_cpu(f: &mut Frame, c: Rect, a: &App) {
             if a.show_kernel {
                 t += &format!(" (kernel {:.0}%)", a.cpu.kernel);
             }
-            spark(f, v[0], t, &a.hist.cpu, Some(100), level_color(a.cpu.overall), a);
+            load_chart(f, v[0], t, &a.hist.cpu, a);
         }
         CpuGraph::Logical => {
             let n = a.cpu.per.len();
@@ -403,7 +407,7 @@ fn perf_cpu(f: &mut Frame, c: Rect, a: &App) {
                         let p = a.cpu.per[j];
                         let e = if a.cpu_static.efficiency.get(j).copied().unwrap_or(false) { "E" } else { "P" };
                         spans.push(Span::raw(format!("{j:>2}{e} ")));
-                        spans.push(Span::styled(bar(p, w.max(4)), Style::new().fg(level_color(p))));
+                        spans.extend(charts::meter(a, p as f64, w.max(4), None));
                         spans.push(Span::raw(format!(" {:>4.0}% {:>4.0}M  ", p, a.freqs.get(j).copied().unwrap_or(0.0))));
                     }
                 }
@@ -425,10 +429,10 @@ fn perf_cpu(f: &mut Frame, c: Rect, a: &App) {
             let (pa, ea) = (if pn > 0 { pc / pn as f32 } else { 0.0 }, if en > 0 { ec / en as f32 } else { 0.0 });
             let l = vec![
                 Line::from(format!("Performance cores ({pn})  {pa:>5.1}%")),
-                Line::from(Span::styled(bar(pa, 50), Style::new().fg(level_color(pa)))),
+                Line::from(charts::meter(a, pa as f64, 50, None)),
                 Line::from(""),
                 Line::from(if en > 0 { format!("Efficiency cores ({en})  {ea:>5.1}%") } else { "Efficiency cores: none (this CPU is not hybrid)".to_string() }),
-                Line::from(Span::styled(bar(ea, 50), Style::new().fg(level_color(ea)))),
+                Line::from(charts::meter(a, ea as f64, 50, None)),
             ];
             f.render_widget(Paragraph::new(l).block(block("% Utilization by processor class", a)), v[0]);
         }
@@ -453,13 +457,19 @@ fn perf_cpu(f: &mut Frame, c: Rect, a: &App) {
 fn perf_mem(f: &mut Frame, c: Rect, a: &App) {
     let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(6), Constraint::Length(5), Constraint::Length(12)]).split(c);
     let m = &a.mem;
-    spark(f, v[0], format!("Memory in use — {} of {}", bytes(m.used as f64), bytes(m.total as f64)), &a.hist.mem, Some(100), Color::Yellow, a);
+    load_chart(f, v[0], format!("Memory in use — {} of {} ({:.0}%)", bytes(m.used as f64), bytes(m.total as f64), m.used as f64 / m.total.max(1) as f64 * 100.0), &a.hist.mem, a);
     let tot = m.total.max(1) as f64;
-    let pct = |x: u64| (x as f64 / tot * 100.0) as f32;
+    let pct = |x: u64| x as f64 / tot * 100.0;
+    let pal = Palette::of(a);
+    let row = |p: f64, hue, text: String| {
+        let mut s = charts::meter(a, p, 40, Some(hue));
+        s.push(Span::raw(format!(" {text}")));
+        Line::from(s)
+    };
     let comp = vec![
-        Line::from(vec![Span::styled(bar(pct(m.used.saturating_sub(m.shared)), 40), Style::new().fg(Color::Yellow)), Span::raw(format!(" used {}", bytes(m.used as f64)))]),
-        Line::from(vec![Span::styled(bar(pct(m.cached + m.buffers), 40), Style::new().fg(Color::Blue)), Span::raw(format!(" cached+buffers {}", bytes((m.cached + m.buffers) as f64)))]),
-        Line::from(vec![Span::styled(bar(pct(m.available), 40), Style::new().fg(Color::Green)), Span::raw(format!(" available {}", bytes(m.available as f64)))]),
+        row(pct(m.used.saturating_sub(m.shared)), pal.used, format!("used {}", bytes(m.used as f64))),
+        row(pct(m.cached + m.buffers), pal.cached, format!("cached+buffers {}", bytes((m.cached + m.buffers) as f64))),
+        row(pct(m.available), pal.free, format!("available {}", bytes(m.available as f64))),
     ];
     f.render_widget(Paragraph::new(comp).block(block("Composition", a)), v[1]);
     let lines = vec![
@@ -478,7 +488,7 @@ fn perf_mem(f: &mut Frame, c: Rect, a: &App) {
 }
 
 fn perf_disk(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
-    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(5), Constraint::Min(4), Constraint::Length(12)]).split(c);
+    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(6), Constraint::Min(6), Constraint::Length(12)]).split(c);
     let devs: Vec<&DiskStat> = match i {
         Some(i) => a.disks.get(i).into_iter().collect(),
         None => a.disks.iter().collect(),
@@ -488,14 +498,13 @@ fn perf_disk(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
         None => String::new(),
     };
     let empty = VecDeque::new();
-    spark(f, v[0], "Active time %".into(), if i.is_some() { a.dh.get(&key("disk")).unwrap_or(&empty) } else { &a.hist.disk }, Some(100), Color::Blue, a);
+    let active = if i.is_some() { a.dh.get(&key("disk")).unwrap_or(&empty) } else { &a.hist.disk };
+    let now = active.back().copied().unwrap_or(0);
+    load_chart(f, v[0], format!("Active time {now}%{}", if i.is_none() { " (busiest disk)" } else { "" }), active, a);
     let (rr, ww): (f64, f64) = (devs.iter().map(|d| d.read_rate).sum(), devs.iter().map(|d| d.write_rate).sum());
-    let hh = if i.is_some() { a.dh.get(&key("dr")).unwrap_or(&empty).clone() } else { VecDeque::new() };
-    if i.is_some() {
-        spark(f, v[1], format!("Read {}   Write {}", rate(rr), rate(ww)), &hh, None, Color::Green, a);
-    } else {
-        f.render_widget(Paragraph::new(format!("Read {}   Write {}", rate(rr), rate(ww))).block(block("Throughput", a)), v[1]);
-    }
+    let tp = |p: &str| sum_hist(devs.iter().filter_map(|d| a.dh.get(&format!("{p}:{}", d.name))));
+    let pal = Palette::of(a);
+    Chart::new(Kind::Rate, block(format!("Throughput — read {}   write {}", rate(rr), rate(ww)), a)).series("read", tp("dr"), Some(pal.read)).series("write", tp("dw"), Some(pal.write)).render(f, v[1], a);
     let mut lines = Vec::new();
     for d in devs {
         lines.push(line(&format!("{} {}", d.name, d.model.trim()), format!("{}{}", bytes(d.size as f64), if d.system { "  [system disk]" } else { "" })));
@@ -519,8 +528,9 @@ fn perf_net(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
         Some(n) => (a.dh.get(&format!("rx:{}", n.name)).unwrap_or(&empty), a.dh.get(&format!("tx:{}", n.name)).unwrap_or(&empty)),
         None => (&a.hist.rx, &a.hist.tx),
     };
-    spark(f, v[0], format!("Receive {}", net_rate(rx)), hr, None, Color::Magenta, a);
-    spark(f, v[1], format!("Send {}", net_rate(tx)), ht, None, Color::LightBlue, a);
+    let pal = Palette::of(a);
+    Chart::new(Kind::NetRate, block(format!("Receive {}", net_rate(rx)), a)).history("receive", hr, 1.0, Some(pal.rx)).render(f, v[0], a);
+    Chart::new(Kind::NetRate, block(format!("Send {}", net_rate(tx)), a)).history("send", ht, 1.0, Some(pal.tx)).render(f, v[1], a);
     let mut l = Vec::new();
     for n in sel {
         l.push(line(&format!("{}{}", n.name, if n.up { "" } else { " (down)" }), if n.wireless { "Wi-Fi".into() } else { "Ethernet / other".into() }));
@@ -542,8 +552,9 @@ fn perf_gpu(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
     let idx = i.unwrap_or(0).min(a.gpu_now.len() - 1);
     let g = &a.gpu_now[idx];
     let empty = VecDeque::new();
-    spark(f, v[0], format!("{} — utilization {:.0}%", g.name, g.util.unwrap_or(0.0)), a.dh.get(&format!("gpu:{idx}")).unwrap_or(&empty), Some(100), Color::Green, a);
-    spark(f, v[1], "GPU memory in use %".into(), a.dh.get(&format!("gmem:{idx}")).unwrap_or(&empty), Some(100), Color::Yellow, a);
+    load_chart(f, v[0], format!("{} — utilization {:.0}%", g.name, g.util.unwrap_or(0.0)), a.dh.get(&format!("gpu:{idx}")).unwrap_or(&empty), a);
+    let gm = a.dh.get(&format!("gmem:{idx}")).unwrap_or(&empty);
+    load_chart(f, v[1], format!("GPU memory in use {}%", gm.back().copied().unwrap_or(0)), gm, a);
     let fm = |x: Option<f32>, u: &str| x.map(|v| format!("{v:.0} {u}")).unwrap_or_else(|| "n/a".into());
     let mut l = vec![
         line("Driver / PCI", format!("{} / {}", g.driver, g.pci)),
@@ -654,40 +665,14 @@ fn temp_stats(h: &VecDeque<u64>) -> Option<(f64, f64, f64)> {
     Some((lo, hi, sum / h.len() as f64))
 }
 
-fn temp_stats_str(a: &App, h: &VecDeque<u64>) -> String {
-    match temp_stats(h) {
-        Some((lo, hi, avg)) => format!("min {}  max {}  avg {}", a.s.temp(lo), a.s.temp(hi), a.s.temp(avg)),
-        None => "no samples yet".into(),
-    }
-}
-
 fn temp_hist<'a>(a: &'a App, t: &Thermal) -> &'a VecDeque<u64> {
     static EMPTY: VecDeque<u64> = VecDeque::new();
     a.dh.get(&t.key).unwrap_or(&EMPTY)
 }
 
-/// Line graph of one sensor's history in the chosen unit, newest sample at the right edge.
-/// `axes` adds time and temperature scales (the dashboard tiles are too small for them).
-fn temp_chart(f: &mut Frame, area: Rect, a: &App, t: &Thermal, blk: Block, axes: bool) {
-    let h = temp_hist(a, t);
-    let start = HIST_LEN.saturating_sub(h.len());
-    let pts: Vec<(f64, f64)> = h.iter().enumerate().map(|(i, &v)| ((start + i) as f64, a.s.temp_value(v as f64 / 10.0))).collect();
-    let (lo, hi) = pts.iter().fold((f64::MAX, f64::MIN), |m, p| (m.0.min(p.1), m.1.max(p.1)));
-    let (lo, hi) = if pts.is_empty() { (0.0, 100.0) } else { (lo, hi) };
-    // at least 10 degrees of range, so sensor noise does not look like a spike
-    let pad = ((10.0 - (hi - lo)) / 2.0).max(0.0) + 1.0;
-    let (lo, hi) = ((lo - pad).floor(), (hi + pad).ceil());
-    let ds = Dataset::default().marker(Marker::Braille).graph_type(GraphType::Line).style(Style::new().fg(level_color(t.celsius as f32))).data(&pts);
-    let mut x = Axis::default().bounds([0.0, (HIST_LEN - 1) as f64]);
-    let mut y = Axis::default().bounds([lo, hi]);
-    if axes {
-        let gray = Style::new().fg(Color::DarkGray);
-        let secs = HIST_LEN as u64 * a.s.refresh_ms.max(250) / 1000;
-        x = x.style(gray).labels(vec![format!("-{secs}s"), format!("-{}s", secs / 2), "now".to_string()]);
-        let u = a.s.temp_unit();
-        y = y.style(gray).labels(vec![format!("{lo:.0}{u}"), format!("{:.0}{u}", (lo + hi) / 2.0), format!("{hi:.0}{u}")]);
-    }
-    f.render_widget(Chart::new(vec![ds]).block(blk).x_axis(x).y_axis(y), area);
+/// Temperature chart of one sensor (history in tenths of °C), in the chosen unit.
+fn temp_chart(f: &mut Frame, area: Rect, a: &App, t: &Thermal, blk: Block<'static>) {
+    Chart::new(Kind::Temp, blk).history(t.name.clone(), temp_hist(a, t), 0.1, None).render(f, area, a);
 }
 
 fn no_thermals(f: &mut Frame, area: Rect, a: &App, title: String) {
@@ -738,12 +723,12 @@ fn thermal_grid(f: &mut Frame, area: Rect, a: &mut App, ts: &[Thermal], title: S
             // shorten the name so the current reading always stays visible
             let room = (cell.width as usize).saturating_sub(cur.chars().count() + 5);
             let name = if t.name.chars().count() > room { format!("{}…", t.name.chars().take(room.saturating_sub(1)).collect::<String>()) } else { t.name.clone() };
-            let now = Line::from(Span::styled(cur, Style::new().fg(level_color(t.celsius as f32)).add_modifier(Modifier::BOLD))).right_aligned();
-            let mut b = Block::default().borders(Borders::ALL).title(format!(" {name} ")).title(now).title_bottom(Line::from(Span::styled(format!(" {} ", temp_stats_str(a, temp_hist(a, t))), Style::new().fg(Color::DarkGray))));
+            let now = Line::from(Span::styled(cur, Style::new().fg(level_color(a, t.celsius as f32)).add_modifier(Modifier::BOLD))).right_aligned();
+            let mut b = Block::default().borders(Borders::ALL).title(format!(" {name} ")).title(now);
             if i == sel {
                 b = b.border_type(BorderType::Thick).border_style(Style::new().fg(accent(a)).add_modifier(Modifier::BOLD));
             }
-            temp_chart(f, *cell, a, t, b, false);
+            temp_chart(f, *cell, a, t, b);
         }
     }
 }
@@ -759,7 +744,7 @@ fn thermal_single(f: &mut Frame, area: Rect, a: &mut App, ts: &[Thermal], title:
     a.offset[P_THERMAL] = off;
     let t = &ts[sel];
     let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(8), Constraint::Length(8)]).split(cols[1]);
-    temp_chart(f, v[0], a, t, block(title, a), true);
+    temp_chart(f, v[0], a, t, block(title, a));
     let h = temp_hist(a, t);
     let mut l = vec![line("Sensor", t.label.clone()), line("Device", t.device.clone()), line("Current", a.s.temp(t.celsius))];
     if let Some((lo, hi, avg)) = temp_stats(h) {
@@ -776,8 +761,8 @@ fn thermal_fullscreen(f: &mut Frame, area: Rect, a: &mut App) {
     let Some(t) = ts.get(a.sel[P_THERMAL]) else {
         return no_thermals(f, area, a, "Thermals — Esc to leave full screen".into());
     };
-    let title = format!("{} — {}   {}   [{}/{}]   ↑↓ ←→ sensor  f/Esc leave full screen", t.name, a.s.temp(t.celsius), temp_stats_str(a, temp_hist(a, t)), a.sel[P_THERMAL] + 1, ts.len());
-    temp_chart(f, area, a, t, block(title, a), true);
+    let title = format!("{} — {}   [{}/{}]   ↑↓ ←→ sensor  f/Esc leave full screen", t.name, a.s.temp(t.celsius), a.sel[P_THERMAL] + 1, ts.len());
+    temp_chart(f, area, a, t, block(title, a));
 }
 
 fn connections(f: &mut Frame, area: Rect, a: &mut App) {
@@ -940,16 +925,22 @@ pub fn capabilities(a: &App) -> Vec<(String, String)> {
 fn recorder(f: &mut Frame, area: Rect, a: &mut App) {
     if let Some(r) = &a.replay {
         let s = &r.trace.samples[r.pos];
-        let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(4), Constraint::Min(6), Constraint::Length(7)]).split(area);
+        let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Min(6), Constraint::Length(7)]).split(area);
+        let n = r.trace.samples.len();
         let total_ms = r.trace.samples.last().map(|s| s.t_ms).unwrap_or(0);
-        f.render_widget(
-            Gauge::default().block(block(format!("REPLAY {} — {} samples — {:.1}s of {:.1}s ({})", r.trace.host, r.trace.samples.len(), s.t_ms as f64 / 1000.0, total_ms as f64 / 1000.0, if r.playing { "playing" } else { "paused" }), a)).ratio(r.pos as f64 / (r.trace.samples.len().max(2) - 1) as f64).gauge_style(Style::new().fg(accent(a))),
-            v[0],
-        );
-        let hist: Vec<u64> = r.trace.samples[..=r.pos].iter().map(|s| s.cpu_overall.round() as u64).collect();
-        let take = v[1].width.saturating_sub(2) as usize;
-        let hist = if hist.len() > take { hist[hist.len() - take..].to_vec() } else { hist };
-        f.render_widget(Sparkline::default().block(block(format!("CPU {:.0}%", s.cpu_overall), a)).data(&hist).max(100).style(Style::new().fg(Color::Green)), v[1]);
+        let title = format!("REPLAY {} — {} samples — {:.1}s of {:.1}s ({})", r.trace.host, n, s.t_ms as f64 / 1000.0, total_ms as f64 / 1000.0, if r.playing { "playing" } else { "paused" });
+        let pal = Palette::of(a);
+        charts::gauge(f, v[0], a, r.pos as f64 / (n.max(2) - 1) as f64, format!("{}/{n}", r.pos + 1), block(title, a), Some(pal.accent));
+        // braille packs two samples per column; keep the window that fits, ending at the position
+        let take = (v[1].width.saturating_sub(8) as usize * 2).max(2);
+        let first = (r.pos + 1).saturating_sub(take);
+        let win = &r.trace.samples[first..=r.pos];
+        let span = (s.t_ms.saturating_sub(win[0].t_ms) as f64 / 1000.0) * take as f64 / win.len().max(2).saturating_sub(1).max(1) as f64;
+        Chart::new(Kind::Percent, block(format!("CPU {:.0}%", s.cpu_overall), a))
+            .series("CPU", win.iter().map(|s| s.cpu_overall as f64).collect(), None)
+            .capacity(take)
+            .span_secs(span)
+            .render(f, v[1], a);
         let mut l = vec![
             line("Memory in use", bytes(s.mem_used as f64)),
             line("Network ↓ / ↑", format!("{} / {}", net_rate(s.net_rx), net_rate(s.net_tx))),
@@ -1001,7 +992,8 @@ fn disk_space(f: &mut Frame, area: Rect, a: &mut App) {
         .map(|m| {
             let used = m.total.saturating_sub(m.free);
             let p = if m.total > 0 { used as f32 / m.total as f32 * 100.0 } else { 0.0 };
-            vec![m.mount.clone(), m.fstype.clone(), format!("{} of {} used, {} free", bytes(used as f64), bytes(m.total as f64), bytes(m.free as f64)), bar(p, 20)]
+            let (fill, track) = charts::meter_text(p as f64, 20);
+            vec![m.mount.clone(), m.fstype.clone(), format!("{} of {} used, {} free", bytes(used as f64), bytes(m.total as f64), bytes(m.free as f64)), fill + &track]
         })
         .collect();
     let n = a.mounts.len();
@@ -1025,9 +1017,13 @@ fn disk_space(f: &mut Frame, area: Rect, a: &mut App) {
         hl.push(Line::from(Span::styled(format!("{} item(s) could not be measured", s.unreadable), Style::new().fg(Color::Yellow))));
     }
     f.render_widget(Paragraph::new(hl).block(block("Scan", a)), v[1]);
+    let accent_rgb = Palette::of(a).accent;
     let cats: Vec<Line> = CATEGORIES.iter().enumerate().map(|(i, c)| {
-        let p = if s.bytes > 0 { s.by_cat[i] as f32 / s.bytes as f32 * 100.0 } else { 0.0 };
-        Line::from(format!("{c:<13} {} {:>5.1}%  {}", bar(p, 24), p, bytes(s.by_cat[i] as f64)))
+        let p = if s.bytes > 0 { s.by_cat[i] as f64 / s.bytes as f64 * 100.0 } else { 0.0 };
+        let mut l = vec![Span::raw(format!("{c:<13} "))];
+        l.extend(charts::meter(a, p, 24, Some(accent_rgb)));
+        l.push(Span::raw(format!(" {p:>5.1}%  {}", bytes(s.by_cat[i] as f64))));
+        Line::from(l)
     }).collect();
     let cols = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Length(56), Constraint::Min(20)]).split(v[2]);
     f.render_widget(Paragraph::new(cats).block(block("By category", a)), cols[0]);
@@ -1053,10 +1049,8 @@ fn fmt_res(v: Option<f64>, unit: &str) -> String {
 fn benchmarks(f: &mut Frame, area: Rect, a: &mut App) {
     let s = a.bench.snapshot();
     let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Length(13), Constraint::Min(4)]).split(area);
-    f.render_widget(
-        Gauge::default().block(block(format!("Benchmark progress — {}", if s.label.is_empty() { "Ready" } else { &s.label }), a)).ratio(s.progress.clamp(0.0, 1.0) as f64).gauge_style(Style::new().fg(accent(a))),
-        v[0],
-    );
+    let p = s.progress.clamp(0.0, 1.0) as f64;
+    charts::gauge(f, v[0], a, p, format!("{:.0}%", p * 100.0), block(format!("Benchmark progress — {}", if s.label.is_empty() { "Ready" } else { &s.label }), a), Some(Palette::of(a).accent));
     let r: &BenchResult = if s.finished || s.cancelled { &s.result } else { a.bench_hist.last().unwrap_or(&s.result) };
     let mut l = vec![
         Line::from(Span::styled(format!("Score {}", r.score.map(|x| format!("{x:.0}")).unwrap_or_else(|| "—".into())), Style::new().add_modifier(Modifier::BOLD).fg(accent(a)))),

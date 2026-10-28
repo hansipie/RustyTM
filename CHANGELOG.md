@@ -4,6 +4,11 @@
 
 ### Added
 - Thermals page (`--page=thermals`): a dashboard with one temperature graph per sensor (hwmon, ACPI thermal zones, GPU), with current, min, max and average. `↑↓`/`n`/`p` cycle through the sensors, `v` switches between the dashboard and a single-sensor view, `f` or `Enter` shows the selected graph full screen (`←→` cycle there too, `Esc` leaves).
+- Disk throughput graph on the Performance page (read and write), also for all disks combined.
+
+### Changed
+- All graphs, bars and progress gauges share one look, drawn with `tui-chart`: smoothed braille area charts with a green → amber → red fill by level (CPU, memory, disk active time, GPU, temperatures), one color per direction for throughput (disk read/write, network receive/send) auto-scaled to round values in the chosen unit (bytes or bits per second), time and value axes when the graph is large enough, and min / max / average over the window in the bottom border. Bars are drawn with sub-cell precision. The Summary network graph shows receive and send together.
+- Updated ratatui to 0.30.
 
 ## 1.2.0 - 2026-10-28
 

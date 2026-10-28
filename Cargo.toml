@@ -12,11 +12,12 @@ categories = ["command-line-utilities", "visualization"]
 include = ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE*"]
 
 [dependencies]
-ratatui = "0.29"
+ratatui = "0.30"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 libc = "0.2"
 ureq = "2"
+tui-chart = { version = "0.6", default-features = false }
 
 [profile.release]
 opt-level = 3

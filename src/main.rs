@@ -1,5 +1,6 @@
 mod app;
 mod bench;
+mod charts;
 mod collect;
 mod diskscan;
 mod draw;

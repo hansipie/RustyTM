@@ -41,6 +41,12 @@ Thermals (one graph per temperature sensor: dashboard or single-sensor view, `�
 full screen), Flight Recorder (record, save, validate, replay), Connections, Installed Apps (uninstall with `u`), Drivers (kernel
 modules), Disk Space (scanner), Benchmarks (CPU, disk, GPU, internet), Disk Health (SMART), Settings. Press `?` for keys.
 
+Graphs share one look on every page (drawn with [tui-chart](https://crates.io/crates/tui-chart)):
+smoothed braille area charts, a green → amber → red fill by level for load and temperatures, one
+color per direction for disk and network throughput (auto-scaled to round values, in bytes or bits
+per second as set), min / max / average over the window in the bottom border, and axes when the
+chart is large enough. Graph colors need a terminal with 24-bit color.
+
 The GPU benchmark (FP32 compute and memory copy bandwidth) uses OpenCL, loaded at run time with
 `dlopen`: nothing to link at build time, and without an OpenCL driver (vendor driver or Mesa
 rusticl) the test just reports that no GPU was found.
