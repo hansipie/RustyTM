@@ -1,6 +1,6 @@
 [package]
 name = "rustytm"
-version = "1.2.0"
+version = "1.3.0"
 edition = "2021"
 description = "Task manager for Linux in Rust: processes, performance, sensors, connections, drivers, disk space, benchmarks, flight recorder"
 license = "MIT"
