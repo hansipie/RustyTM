@@ -11,7 +11,7 @@
 [![Stars](https://img.shields.io/github/stars/hansipie/RustyTM?style=flat)](https://github.com/hansipie/RustyTM/stargazers)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/hansipie/RustyTM/main/docs/slideshow.svg" alt="RustyTM slideshow: Summary, Processes, Performance, System Info, Power &amp; Freq, Drivers, Disk Space, Benchmarks" width="900">
+  <img src="https://raw.githubusercontent.com/hansipie/RustyTM/main/docs/slideshow.svg" alt="RustyTM slideshow: Summary, Processes, Performance, System Info, Power &amp; Freq, Thermals, Battery, Drivers, Disk Space, Benchmarks" width="900">
   <br>
   <sub>Slideshow of the main pages (rendered with <code>rustytm --dump=&lt;page&gt;</code>)</sub>
 </p>
