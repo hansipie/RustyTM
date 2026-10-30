@@ -691,6 +691,124 @@ pub fn sensors(rapl: &mut Rapl, logical: usize, gpu_list: &[GpuStat]) -> SensorS
     SensorSet { sensors: s, restricted }
 }
 
+// ───────────────────────────── Battery ─────────────────────────────
+
+/// One battery from `/sys/class/power_supply`: the laptop's own, or a peripheral's (mouse, keyboard).
+#[derive(Clone, Default)]
+pub struct Battery {
+    pub name: String,
+    pub status: String,
+    /// `None` while the device does not report a level (asleep, disconnected)
+    pub percent: Option<f64>,
+    /// a battery of a device (mouse, headset) rather than of this computer
+    pub peripheral: bool,
+    /// coarse level (Low, Normal, Full) for devices without a percentage
+    pub level: String,
+    /// Wh
+    pub energy_now: Option<f64>,
+    pub energy_full: Option<f64>,
+    pub energy_design: Option<f64>,
+    /// W drawn from (discharging) or fed into (charging) the battery
+    pub power_w: Option<f64>,
+    pub voltage_v: Option<f64>,
+    pub cycles: Option<u64>,
+    pub technology: String,
+    pub model: String,
+    pub manufacturer: String,
+}
+
+impl Battery {
+    pub fn charging(&self) -> bool {
+        self.status == "Charging"
+    }
+
+    pub fn discharging(&self) -> bool {
+        self.status == "Discharging"
+    }
+
+    /// Full capacity as a share of the design capacity.
+    pub fn health(&self) -> Option<f64> {
+        match (self.energy_full, self.energy_design) {
+            (Some(f), Some(d)) if d > 0.0 => Some(f / d * 100.0),
+            _ => None,
+        }
+    }
+
+    /// Seconds until empty (discharging) or full (charging) at `watts`, `None` when idle or unknown.
+    pub fn eta_secs(&self, watts: f64) -> Option<f64> {
+        if watts < 0.5 {
+            return None;
+        }
+        let (now, full) = (self.energy_now?, self.energy_full?);
+        if self.discharging() {
+            Some(now / watts * 3600.0)
+        } else if self.charging() {
+            Some((full - now).max(0.0) / watts * 3600.0)
+        } else {
+            None
+        }
+    }
+}
+
+pub fn batteries() -> Vec<Battery> {
+    let Ok(rd) = std::fs::read_dir("/sys/class/power_supply") else { return vec![] };
+    let mut dirs: Vec<_> = rd.flatten().collect();
+    dirs.sort_by_key(|e| e.file_name());
+    let mut out = Vec::new();
+    for e in dirs {
+        let p = e.path().to_string_lossy().into_owned();
+        if read(&format!("{p}/type")).as_deref() != Some("Battery") {
+            continue;
+        }
+        if read(&format!("{p}/present")).as_deref() == Some("0") {
+            continue;
+        }
+        let f = |n: &str| read_f64(&format!("{p}/{n}"));
+        let volt = f("voltage_now").or_else(|| f("voltage_min_design")).map(|v| v / 1e6);
+        // some firmwares report charge (µAh) instead of energy (µWh)
+        let energy = |en: &str, ch: &str| f(en).map(|v| v / 1e6).or_else(|| Some(f(ch)? * volt? / 1e6));
+        let power = f("power_now").map(|v| v.abs() / 1e6).or_else(|| Some(f("current_now")?.abs() * volt? / 1e6));
+        let energy_now = energy("energy_now", "charge_now");
+        let energy_full = energy("energy_full", "charge_full");
+        let percent = f("capacity").or_else(|| Some(energy_now? / energy_full? * 100.0));
+        out.push(Battery {
+            name: e.file_name().to_string_lossy().into_owned(),
+            status: read(&format!("{p}/status")).unwrap_or_else(|| "Unknown".into()),
+            percent,
+            peripheral: read(&format!("{p}/scope")).as_deref() == Some("Device"),
+            level: read(&format!("{p}/capacity_level")).filter(|l| l != "Unknown").unwrap_or_default(),
+            energy_now,
+            energy_full,
+            energy_design: energy("energy_full_design", "charge_full_design"),
+            power_w: power,
+            voltage_v: volt,
+            cycles: f("cycle_count").map(|c| c as u64).filter(|&c| c > 0),
+            technology: read(&format!("{p}/technology")).unwrap_or_default(),
+            model: read(&format!("{p}/model_name")).unwrap_or_default(),
+            manufacturer: read(&format!("{p}/manufacturer")).unwrap_or_default(),
+        });
+    }
+    // the computer's own batteries first
+    out.sort_by_key(|b| b.peripheral);
+    out
+}
+
+/// True when mains power is connected (any non-battery, non-USB-peripheral supply online).
+pub fn ac_online() -> Option<bool> {
+    let rd = std::fs::read_dir("/sys/class/power_supply").ok()?;
+    let mut seen = false;
+    for e in rd.flatten() {
+        let p = e.path().to_string_lossy().into_owned();
+        if read(&format!("{p}/type")).as_deref() == Some("Mains") {
+            seen = true;
+            if read(&format!("{p}/online")).as_deref() == Some("1") {
+                return Some(true);
+            }
+        }
+    }
+    seen.then_some(false)
+}
+
 // ───────────────────────────── System information ─────────────────────────────
 
 pub type InfoSection = (String, Vec<(String, String)>);

@@ -38,7 +38,8 @@ Or from source:
 Pages: Summary, Processes (tree, signals, nice, affinity, details), Performance (CPU/memory/disks/
 network/GPU), App history, Startup apps, Users, Services, System Info (export; memory and Wi-Fi details), Power & Freq,
 Thermals (one graph per temperature sensor: dashboard or single-sensor view, `↑↓` to cycle, `v` to switch, `f` for
-full screen), Flight Recorder (record, save, validate, replay), Connections, Installed Apps (uninstall with `u`), Drivers (kernel
+full screen), Battery (laptop and peripheral batteries: status, energy, power, health, cycles, charge and power graphs with a
+forecast to empty or full), Flight Recorder (record, save, validate, replay), Connections, Installed Apps (uninstall with `u`), Drivers (kernel
 modules), Disk Space (scanner), Benchmarks (CPU, disk, GPU, internet), Disk Health (SMART), Settings. Press `?` for keys.
 
 Graphs share one look on every page (drawn with [tui-chart](https://crates.io/crates/tui-chart)):

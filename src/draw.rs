@@ -96,6 +96,7 @@ pub fn draw(f: &mut Frame, a: &mut App) {
         P_SYSINFO => sysinfo(f, c, a),
         P_POWER => power(f, c, a),
         P_THERMAL => thermals(f, c, a),
+        P_BATTERY => battery(f, c, a),
         P_RECORDER => recorder(f, c, a),
         P_CONN => connections(f, c, a),
         P_APPS => installed(f, c, a),
@@ -134,6 +135,7 @@ fn hints(a: &App) -> &'static str {
         P_SERVICES => "s start  x stop  R restart  e enable/disable  g process  r reload  / filter",
         P_SYSINFO => "↑↓ scroll  E export  r reload",
         P_THERMAL => "↑↓ sensor  v dashboard/single  f/Enter full screen  / filter",
+        P_BATTERY => "↑↓ battery  (the graphs fill in as time passes; forecast = current power held constant)",
         P_RECORDER => "r record/stop  s save  d discard  Enter replay  o open file  (replay: Space play  ,/. step  x close)",
         P_CONN => "a all  l listening  p public  t IPC  g process  r reload  / filter",
         P_APPS => "u uninstall  p packages without desktop entries  r reload  / filter",
@@ -763,6 +765,117 @@ fn thermal_fullscreen(f: &mut Frame, area: Rect, a: &mut App) {
     };
     let title = format!("{} — {}   [{}/{}]   ↑↓ ←→ sensor  f/Esc leave full screen", t.name, a.s.temp(t.celsius), a.sel[P_THERMAL] + 1, ts.len());
     temp_chart(f, area, a, t, block(title, a));
+}
+
+// ───────────── battery ─────────────
+
+/// "2h 05m", "37m".
+fn hm(secs: f64) -> String {
+    let m = (secs / 60.0).round() as u64;
+    if m >= 60 {
+        format!("{}h {:02}m", m / 60, m % 60)
+    } else {
+        format!("{m}m")
+    }
+}
+
+/// Samples on each side of "now" in the battery graphs (one hour at one sample per `BAT_EVERY`).
+const BAT_WINDOW: usize = 360;
+
+fn battery(f: &mut Frame, area: Rect, a: &mut App) {
+    let ac = match a.ac {
+        Some(true) => "AC connected",
+        Some(false) => "on battery",
+        None => "no AC adapter reported",
+    };
+    if a.batteries.is_empty() {
+        let t = page_title(a, P_BATTERY, "");
+        let msg = format!("No battery found in /sys/class/power_supply ({ac}). This page is for laptops.");
+        return f.render_widget(Paragraph::new(msg).block(block(t, a)), area);
+    }
+    a.sel[P_BATTERY] = a.sel[P_BATTERY].min(a.batteries.len() - 1);
+    let b = a.batteries[a.sel[P_BATTERY]].clone();
+    let hist = a.bat_hist.get(&b.name);
+    let watts = hist.and_then(|h| h.ema).or(b.power_w).unwrap_or(0.0);
+    let eta = a.battery_eta(&b);
+    let pal = Palette::of(a);
+
+    // ── details
+    let nb = if a.batteries.len() > 1 { format!("{} [{}/{}]", b.name, a.sel[P_BATTERY] + 1, a.batteries.len()) } else { b.name.clone() };
+    let kind = if b.peripheral { "device" } else { "internal" };
+    let mut l = vec![line("Battery", format!("{nb} ({kind})  {} {}", b.manufacturer, b.model).trim_end().to_string())];
+    l.push(line("Status", format!("{} — {ac}", b.status)));
+    let mut charge = vec![Span::styled(format!("{:<26}", "Charge"), Style::new().fg(Color::DarkGray))];
+    match b.percent {
+        Some(p) => {
+            charge.extend(charts::meter(a, p, 24, None));
+            charge.push(Span::raw(format!(" {p:.0}%")));
+        }
+        None if !b.level.is_empty() => charge.push(Span::raw(b.level.clone())),
+        None => charge.push(Span::styled("not reported (device asleep or disconnected)", Style::new().fg(Color::DarkGray))),
+    }
+    l.push(Line::from(charge));
+    if let (Some(n), Some(full)) = (b.energy_now, b.energy_full) {
+        l.push(line("Energy", format!("{n:.1} Wh of {full:.1} Wh")));
+    }
+    if let Some(w) = b.power_w {
+        let dir = if b.charging() { "charging" } else if b.discharging() { "discharging" } else { "idle" };
+        l.push(line("Power", format!("{w:.1} W {dir}{}", b.voltage_v.map(|v| format!("  ({v:.2} V)")).unwrap_or_default())));
+    }
+    l.push(line(
+        if b.charging() { "Time to full" } else { "Time remaining" },
+        match eta {
+            Some(s) => format!("{} (estimate at {watts:.1} W)", hm(s)),
+            None if b.status == "Full" => "fully charged".into(),
+            None => "—".into(),
+        },
+    ));
+    if let Some(h) = b.health() {
+        l.push(line("Health", format!("{h:.0}% of design capacity ({:.1} of {:.1} Wh)", b.energy_full.unwrap_or(0.0), b.energy_design.unwrap_or(0.0))));
+    }
+    if let Some(c) = b.cycles {
+        l.push(line("Charge cycles", c.to_string()));
+    }
+    if !b.technology.is_empty() {
+        l.push(line("Technology", b.technology.clone()));
+    }
+    // a device reports no power, so its page is the charge graph only
+    let has_power = b.power_w.is_some();
+    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(l.len() as u16 + 2), Constraint::Min(8), Constraint::Length(if has_power { 10 } else { 0 })]).split(area);
+    f.render_widget(Paragraph::new(l).block(block(page_title(a, P_BATTERY, &b.status.to_lowercase()), a)), v[0]);
+
+    // ── charge curve with forecast
+    let empty = VecDeque::new();
+    let (pct, pw) = hist.map_or((&empty, &empty), |h| (&h.pct, &h.watts));
+    let take = |q: &VecDeque<u64>| q.iter().skip(q.len().saturating_sub(BAT_WINDOW)).map(|&x| x as f64).collect::<Vec<f64>>();
+    let now = b.percent.map_or("no reading".to_string(), |p| format!("{p:.0}%"));
+    let mut chart = Chart::new(Kind::Percent, block(format!("Charge — {now}  (history, then forecast at current power)"), a))
+        .capacity(2 * BAT_WINDOW + 1)
+        .span_secs(2.0 * BAT_WINDOW as f64 * BAT_EVERY as f64)
+        .series("charge", take(pct).into_iter().map(|x| x / 10.0).collect(), None);
+    // forecast: energy moves linearly at the smoothed power until empty or full
+    let full = b.energy_full.unwrap_or(0.0);
+    if let (Some(pct_now), true) = (b.percent, watts >= 0.5 && full > 0.0 && (b.charging() || b.discharging())) {
+        let per_step = watts * BAT_EVERY as f64 / 3600.0 / full * 100.0;
+        let dir = if b.charging() { 1.0 } else { -1.0 };
+        let ahead: Vec<f64> = (0..=BAT_WINDOW).map(|k| (pct_now + dir * per_step * k as f64).clamp(0.0, 100.0)).collect();
+        chart = chart.forecast(BAT_WINDOW, "forecast", ahead);
+    } else {
+        chart = chart.forecast(BAT_WINDOW, "", vec![]);
+    }
+    chart.render(f, v[1], a);
+
+    // ── power curve
+    if !has_power {
+        return;
+    }
+    let hue = if b.charging() { pal.write } else { pal.read };
+    let title = format!("Power {} — {:.1} W", if b.charging() { "into the battery" } else { "drawn from the battery" }, b.power_w.unwrap_or(0.0));
+    Chart::new(Kind::Power, block(title, a))
+        .capacity(BAT_WINDOW)
+        .span_secs(BAT_WINDOW as f64 * BAT_EVERY as f64)
+        .series("power", take(pw).into_iter().map(|x| x / 100.0).collect(), Some(hue))
+        .render(f, v[2], a);
 }
 
 fn connections(f: &mut Frame, area: Rect, a: &mut App) {

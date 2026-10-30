@@ -146,6 +146,8 @@ pub enum Kind {
     Rate,
     /// Network rate: bytes or bits per second depending on the setting.
     NetRate,
+    /// Electrical power in watts (battery draw).
+    Power,
 }
 
 impl Kind {
@@ -160,6 +162,7 @@ impl Kind {
             Kind::Temp => a.s.temp(v),
             Kind::Rate => rate(v),
             Kind::NetRate => net_rate(v),
+            Kind::Power => format!("{v:.1} W"),
         }
     }
 }
@@ -177,11 +180,14 @@ pub struct Chart {
     series: Vec<Trend>,
     capacity: usize,
     span_secs: Option<f64>,
+    /// slots to the right of "now" reserved for a forecast, and the forecast itself
+    future: usize,
+    ahead: Vec<Trend>,
 }
 
 impl Chart {
     pub fn new(kind: Kind, block: Block<'static>) -> Self {
-        Chart { kind, block, series: Vec::new(), capacity: crate::app::HIST_LEN, span_secs: None }
+        Chart { kind, block, series: Vec::new(), capacity: crate::app::HIST_LEN, span_secs: None, future: 0, ahead: Vec::new() }
     }
 
     /// Add a series of raw readings (oldest first). `hue` is required for throughput charts and
@@ -195,6 +201,14 @@ impl Chart {
     pub fn history(self, name: impl Into<String>, h: &VecDeque<u64>, scale: f64, hue: Option<Rgb>) -> Self {
         let v = h.iter().map(|&x| x as f64 * scale).collect();
         self.series(name, v, hue)
+    }
+
+    /// Reserve `slots` to the right of "now" and draw `values` there as a forecast line (the first
+    /// value is the current reading). Use a capacity of `2 * slots + 1` so "now" sits mid-axis.
+    pub fn forecast(mut self, slots: usize, name: impl Into<String>, values: Vec<f64>) -> Self {
+        self.future = slots;
+        self.ahead.push(Trend { name: name.into(), values, hue: None });
+        self
     }
 
     /// Number of samples the x axis spans (default: the live history length).
@@ -232,12 +246,14 @@ impl Chart {
             Kind::Rate => (0.0, nice_ceiling(if empty { 0.0 } else { mx }, 1024.0, 1.0)),
             Kind::NetRate if a.s.net_bits => (0.0, nice_ceiling(if empty { 0.0 } else { mx }, 1000.0, 8.0)),
             Kind::NetRate => (0.0, nice_ceiling(if empty { 0.0 } else { mx }, 1024.0, 1.0)),
+            Kind::Power => (0.0, ((if empty { 0.0 } else { mx } * 1.15).max(5.0) / 5.0).ceil() * 5.0),
         };
         let ylab = |v: f64| match kind {
             Kind::Percent => format!("{v:.0}%"),
             Kind::Temp => format!("{v:.0}{}", a.s.temp_unit()),
             Kind::Rate => compact(bytes(v)),
             Kind::NetRate => compact(net_rate(v).trim_end_matches("/s").to_string()),
+            Kind::Power => format!("{v:.0}W"),
         };
         // level colors are sampled along the value scale, so the fill reads like a thermometer
         let level_at = |d: f64| {
@@ -245,7 +261,7 @@ impl Chart {
             pal.heat(c)
         };
 
-        let start = |n: usize| self.capacity.saturating_sub(n) as f64;
+        let start = |n: usize| self.capacity.saturating_sub(n + self.future) as f64;
         let mut out = Vec::with_capacity(self.series.len());
         for (i, s) in self.series.iter().enumerate() {
             let shown = &s.values[s.values.len().saturating_sub(self.capacity)..];
@@ -264,9 +280,22 @@ impl Chart {
             out.push(Series::new(s.name.clone()).data(pts).color(line).fill_gradient(grad).mode(mode));
         }
 
+        // the forecast is a dimmed line starting at "now"
+        let now_x = self.capacity.saturating_sub(self.future + 1) as f64;
+        for s in &self.ahead {
+            let pts: Vec<(f64, f64)> = s.values.iter().take(self.future + 1).enumerate().map(|(k, &v)| (now_x + k as f64, disp(v).clamp(lo, hi))).collect();
+            out.push(Series::new(s.name.clone()).data(pts).color(pal.label).mode(LineMode::Line));
+        }
+
         let axis = |labels: Vec<String>| Axis::new().labels(labels).style(Style::new().fg(pal.axis)).label_style(Style::new().fg(pal.label)).grid_style(Style::new().fg(pal.axis));
         let span = self.span_secs.unwrap_or(self.capacity as f64 * a.s.refresh_ms.max(250) as f64 / 1000.0);
-        let xl = if show_x { vec![format!("-{}", ago(span)), format!("-{}", ago(span / 2.0)), "now".into()] } else { vec![] };
+        let xl = if show_x && self.future > 0 {
+            vec![format!("-{}", ago(span / 2.0)), "now".into(), format!("+{}", ago(span / 2.0))]
+        } else if show_x {
+            vec![format!("-{}", ago(span)), format!("-{}", ago(span / 2.0)), "now".into()]
+        } else {
+            vec![]
+        };
         let yl = if show_y { vec![ylab(lo), ylab((lo + hi) / 2.0), ylab(hi)] } else { vec![] };
         // the statistics legend drops min, then max, until it fits the bottom border
         let room = area.width.saturating_sub(4) as usize;

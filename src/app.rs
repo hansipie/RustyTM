@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-pub const PAGES: [&str; 18] = [
-    "Summary", "Processes", "Performance", "App history", "Startup apps", "Users", "Services", "System Info", "Power & Freq", "Thermals", "Flight Recorder", "Connections", "Installed Apps", "Drivers", "Disk Space", "Benchmarks", "Disk Health", "Settings",
+pub const PAGES: [&str; 19] = [
+    "Summary", "Processes", "Performance", "App history", "Startup apps", "Users", "Services", "System Info", "Power & Freq", "Thermals", "Battery", "Flight Recorder", "Connections", "Installed Apps", "Drivers", "Disk Space", "Benchmarks", "Disk Health", "Settings",
 ];
 pub const N_PAGES: usize = PAGES.len();
 pub const P_SUMMARY: usize = 0;
@@ -27,23 +27,27 @@ pub const P_SERVICES: usize = 6;
 pub const P_SYSINFO: usize = 7;
 pub const P_POWER: usize = 8;
 pub const P_THERMAL: usize = 9;
-pub const P_RECORDER: usize = 10;
-pub const P_CONN: usize = 11;
-pub const P_APPS: usize = 12;
-pub const P_DRIVERS: usize = 13;
-pub const P_DISK: usize = 14;
-pub const P_BENCH: usize = 15;
-pub const P_HEALTH: usize = 16;
-pub const P_SETTINGS: usize = 17;
+pub const P_BATTERY: usize = 10;
+pub const P_RECORDER: usize = 11;
+pub const P_CONN: usize = 12;
+pub const P_APPS: usize = 13;
+pub const P_DRIVERS: usize = 14;
+pub const P_DISK: usize = 15;
+pub const P_BENCH: usize = 16;
+pub const P_HEALTH: usize = 17;
+pub const P_SETTINGS: usize = 18;
 
 pub const HIST_LEN: usize = 120;
+/// The battery history is sampled this often (seconds) and keeps `BAT_LEN` samples (3 hours).
+pub const BAT_EVERY: u64 = 10;
+pub const BAT_LEN: usize = 1080;
 pub const PROC_COLS: [&str; 9] = ["Name", "PID", "CPU", "Memory", "Disk read", "Disk write", "User", "Status", "Threads"];
 
 pub fn page_from_name(n: &str) -> Option<usize> {
     let n = n.to_lowercase().replace(['-', '_', ' ', '&'], "");
     let alias: &[(&str, usize)] = &[
         ("summary", P_SUMMARY), ("processes", P_PROCESSES), ("process", P_PROCESSES), ("performance", P_PERF), ("apphistory", P_APPHIST), ("history", P_APPHIST), ("startup", P_STARTUP), ("startupapps", P_STARTUP), ("users", P_USERS), ("services", P_SERVICES),
-        ("sysinfo", P_SYSINFO), ("systeminfo", P_SYSINFO), ("powerfreq", P_POWER), ("powerandfreq", P_POWER), ("power", P_POWER), ("thermals", P_THERMAL), ("thermal", P_THERMAL), ("temperatures", P_THERMAL), ("temps", P_THERMAL),
+        ("sysinfo", P_SYSINFO), ("systeminfo", P_SYSINFO), ("powerfreq", P_POWER), ("powerandfreq", P_POWER), ("power", P_POWER), ("thermals", P_THERMAL), ("thermal", P_THERMAL), ("temperatures", P_THERMAL), ("temps", P_THERMAL), ("battery", P_BATTERY), ("batteries", P_BATTERY), ("bat", P_BATTERY),
         ("recorder", P_RECORDER), ("flightrecorder", P_RECORDER), ("flight", P_RECORDER), ("connections", P_CONN), ("networkconnections", P_CONN),
         ("installedapps", P_APPS), ("apps", P_APPS), ("drivers", P_DRIVERS), ("kernelmodules", P_DRIVERS), ("diskspace", P_DISK), ("disk", P_DISK), ("benchmarks", P_BENCH), ("benchmark", P_BENCH), ("diskhealth", P_HEALTH), ("health", P_HEALTH), ("smart", P_HEALTH), ("settings", P_SETTINGS),
     ];
@@ -135,6 +139,15 @@ pub struct Thermal {
     pub celsius: f64,
 }
 
+/// Charge and power history of one battery (percent in tenths, watts in hundredths).
+#[derive(Default)]
+pub struct BatHist {
+    pub pct: VecDeque<u64>,
+    pub watts: VecDeque<u64>,
+    /// smoothed power, W: steadies the time estimate
+    pub ema: Option<f64>,
+}
+
 pub struct App {
     pub s: Settings,
     pub page: usize,
@@ -179,6 +192,12 @@ pub struct App {
     // thermals
     pub thermal_mode: ThermalMode,
     pub thermal_full: bool,
+
+    // battery
+    pub batteries: Vec<Battery>,
+    pub ac: Option<bool>,
+    pub bat_hist: HashMap<String, BatHist>,
+    bat_last: Option<Instant>,
 
     // processes
     pub proc_sel: i32,
@@ -292,6 +311,10 @@ impl App {
             show_kernel: false,
             thermal_mode: ThermalMode::Grid,
             thermal_full: false,
+            batteries: vec![],
+            ac: None,
+            bat_hist: HashMap::new(),
+            bat_last: None,
             proc_sel: 0,
             proc_values: true,
             collapsed,
@@ -411,6 +434,7 @@ impl App {
         for (k, v) in dh {
             push(self.dh.entry(k).or_default(), v);
         }
+        self.sample_battery();
         self.record_sample();
         self.step_replay_clock();
         if self.msg.as_ref().map_or(false, |(_, t)| t.elapsed() > Duration::from_secs(6)) {
@@ -418,6 +442,41 @@ impl App {
         }
         self.poll_bg();
         self.periodic_refresh();
+    }
+
+    /// Battery state is read every tick; the long-term history only every `BAT_EVERY` seconds.
+    fn sample_battery(&mut self) {
+        self.batteries = batteries();
+        self.ac = ac_online();
+        let due = self.bat_last.map_or(true, |t| t.elapsed() >= Duration::from_secs(BAT_EVERY));
+        for b in &self.batteries {
+            let h = self.bat_hist.entry(b.name.clone()).or_default();
+            if let Some(w) = b.power_w {
+                // idle readings are zero: let the average fall to zero rather than keep a stale estimate
+                let w = if b.charging() || b.discharging() { w } else { 0.0 };
+                h.ema = Some(h.ema.map_or(w, |e| e * 0.9 + w * 0.1));
+            }
+            if due {
+                let cap = |q: &mut VecDeque<u64>, v: u64| {
+                    if q.len() >= BAT_LEN {
+                        q.pop_front();
+                    }
+                    q.push_back(v);
+                };
+                if let Some(p) = b.percent {
+                    cap(&mut h.pct, (p.clamp(0.0, 100.0) * 10.0).round() as u64);
+                }
+                cap(&mut h.watts, (b.power_w.unwrap_or(0.0) * 100.0).round() as u64);
+            }
+        }
+        if due {
+            self.bat_last = Some(Instant::now());
+        }
+    }
+
+    /// Time estimate for a battery, from the smoothed power.
+    pub fn battery_eta(&self, b: &Battery) -> Option<f64> {
+        b.eta_secs(self.bat_hist.get(&b.name)?.ema?)
     }
 
     fn net_totals(&self) -> (f64, f64) {
@@ -760,6 +819,7 @@ impl App {
             P_SERVICES => self.service_view().len(),
             P_POWER => self.power_view().len(),
             P_THERMAL => self.thermal_view().len(),
+            P_BATTERY => self.batteries.len(),
             P_CONN => self.scope_conns().len(),
             P_APPS => self.app_view().len(),
             P_DRIVERS => self.module_view().len(),

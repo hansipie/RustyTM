@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Battery page (`--page=battery`) for laptops: status, charge, energy in Wh, power draw, voltage, time remaining or time to full, health against the design capacity and charge cycles, read from `/sys/class/power_supply` (peripheral batteries such as wireless mice are listed too, with their level when they report one). A charge graph shows the last hour (sampled every 10 s while RustyTM runs) followed by a forecast to empty or full at the current power, and a second graph shows the power drawn or fed. `↑↓` switch between batteries; a device without power readings shows the charge graph only. Pages after "Thermals" shift by one.
+
 ## 1.3.0 - 2026-10-28
 
 ### Added
