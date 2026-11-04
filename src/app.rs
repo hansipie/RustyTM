@@ -1285,14 +1285,14 @@ impl App {
         match k.code {
             KeyCode::Down | KeyCode::Char('j') => self.perf_dev = (self.perf_dev + 1).min(n.saturating_sub(1)),
             KeyCode::Up | KeyCode::Char('k') => self.perf_dev = self.perf_dev.saturating_sub(1),
-            KeyCode::Char('g') => {
+            KeyCode::Char('g') if self.perf_dev == 0 => {
                 self.cpu_graph = match self.cpu_graph {
                     CpuGraph::Overall => CpuGraph::Logical,
                     CpuGraph::Logical => CpuGraph::Classes,
                     CpuGraph::Classes => CpuGraph::Overall,
                 }
             }
-            KeyCode::Char('K') => self.show_kernel = !self.show_kernel,
+            KeyCode::Char('K') if self.perf_dev == 0 => self.show_kernel = !self.show_kernel,
             KeyCode::Char('c') => {
                 self.s.combined_disks = !self.s.combined_disks;
                 self.s.combined_network = self.s.combined_disks;
