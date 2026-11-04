@@ -170,8 +170,15 @@ fn status(f: &mut Frame, area: Rect, a: &App) {
 
 #[allow(clippy::too_many_arguments)]
 pub fn table(f: &mut Frame, area: Rect, title: String, headers: &[&str], widths: &[Constraint], rows: Vec<Vec<String>>, sel: usize, off: &mut usize, a: &App) {
-    let h = area.height.saturating_sub(3) as usize;
     let total = rows.len();
+    let mut rows: Vec<Option<Vec<String>>> = rows.into_iter().map(Some).collect();
+    table_lazy(f, area, title, headers, widths, total, |i| rows[i].take().unwrap_or_default(), sel, off, a);
+}
+
+/// Like `table`, but only the rows that fit on screen are built: `row(i)` is called for visible indices only.
+#[allow(clippy::too_many_arguments)]
+pub fn table_lazy(f: &mut Frame, area: Rect, title: String, headers: &[&str], widths: &[Constraint], total: usize, mut row: impl FnMut(usize) -> Vec<String>, sel: usize, off: &mut usize, a: &App) {
+    let h = area.height.saturating_sub(3) as usize;
     // a selection past the end means "no selection": keep the view at the top
     if sel >= total {
         *off = 0;
@@ -183,11 +190,8 @@ pub fn table(f: &mut Frame, area: Rect, title: String, headers: &[&str], widths:
             *off = sel + 1 - h;
         }
     }
-    let body: Vec<Row> = rows
-        .into_iter()
-        .enumerate()
-        .skip(*off)
-        .take(h)
+    let body: Vec<Row> = (*off..total.min(*off + h))
+        .map(|i| (i, row(i)))
         .map(|(i, r)| {
             let selected = i == sel;
             let st = if selected { Style::new().fg(Color::Black).bg(accent(a)) } else { Style::new() };
@@ -302,10 +306,10 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
     let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(5), Constraint::Length(4)]).split(area);
     let view = a.proc_view();
     let cur = view.iter().position(|(_, i)| a.plist[*i].pid == a.proc_sel).unwrap_or(0);
-    let mut rows = Vec::with_capacity(view.len());
     let gpu = a.gpu_by_pid();
     let parents: std::collections::HashSet<i32> = a.plist.iter().map(|p| p.ppid).collect();
-    for (d, i) in &view {
+    let build = |n: usize| -> Vec<String> {
+        let (d, i) = &view[n];
         let p = &a.plist[*i];
         let mark = if a.s.process_tree && a.filter[P_PROCESSES].is_empty() {
             let m = if parents.contains(&p.pid) { if a.collapsed.contains(&p.pid) { "▸ " } else { "▾ " } } else { "  " };
@@ -314,7 +318,7 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
             String::new()
         };
         let mem = if a.proc_values || a.mem.total == 0 { bytes(p.rss as f64) } else { format!("{:.1}%", p.rss as f64 / a.mem.total as f64 * 100.0) };
-        rows.push(vec![
+        vec![
             format!("{mark}{}", p.name),
             p.pid.to_string(),
             format!("{:.1}%", p.cpu),
@@ -326,21 +330,22 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
             p.threads.to_string(),
             gpu.get(&(p.pid as u32)).and_then(|g| g.0).map(|v| format!("{v:.0}%")).unwrap_or_else(|| "-".into()),
             gpu.get(&(p.pid as u32)).and_then(|g| g.1).map(|v| bytes(v as f64)).unwrap_or_else(|| "-".into()),
-        ]);
-    }
+        ]
+    };
     let arrow = if a.s.sort_desc { "▼" } else { "▲" };
     let heads: Vec<String> = PROC_COLS.iter().enumerate().map(|(i, c)| if i == a.s.sort_col && !(a.s.process_tree && a.filter[P_PROCESSES].is_empty()) { format!("{c} {arrow}") } else { c.to_string() }).collect();
     let hs: Vec<&str> = heads.iter().map(|s| s.as_str()).collect();
     let extra = format!("{} total CPU {:.0}%{}", a.procs.len(), a.cpu.overall, if a.s.process_tree { " — tree" } else { "" });
     let title = page_title(a, P_PROCESSES, &extra);
     let mut off = a.offset[P_PROCESSES];
-    table(
+    table_lazy(
         f,
         v[0],
         title,
         &hs,
         &[Constraint::Min(14), Constraint::Length(7), Constraint::Length(7), Constraint::Length(9), Constraint::Length(10), Constraint::Length(10), Constraint::Length(9), Constraint::Length(9), Constraint::Length(7), Constraint::Length(5), Constraint::Length(9)],
-        rows,
+        view.len(),
+        build,
         cur,
         &mut off,
         a,

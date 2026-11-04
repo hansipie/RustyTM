@@ -106,19 +106,32 @@ fn main() {
     let upd = update::start_check();
     let mut term = ratatui::init();
     let res = (|| -> std::io::Result<()> {
+        // Redraw only when something may have changed: input, resize, a sample, or live progress.
+        let mut dirty = true;
         loop {
-            term.draw(|f| draw::draw(f, &mut a))?;
+            if dirty {
+                term.draw(|f| draw::draw(f, &mut a))?;
+                dirty = false;
+            }
             let interval = Duration::from_millis(a.s.refresh_ms.max(250));
             let wait = interval.saturating_sub(a.last_tick.elapsed()).min(Duration::from_millis(200));
             if event::poll(wait)? {
-                if let Event::Key(k) = event::read()? {
-                    if k.kind != KeyEventKind::Release {
+                match event::read()? {
+                    Event::Key(k) if k.kind != KeyEventKind::Release => {
                         a.on_key(k);
+                        dirty = true;
                     }
+                    Event::Resize(..) => dirty = true,
+                    _ => {}
                 }
             }
             if a.last_tick.elapsed() >= interval {
                 a.tick();
+                dirty = true;
+            }
+            // background work reports progress between samples
+            if a.bench.running() || a.scanner.running() || a.loading(a.page) {
+                dirty = true;
             }
             if a.quit {
                 return Ok(());
