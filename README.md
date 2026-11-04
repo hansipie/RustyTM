@@ -51,7 +51,11 @@ libraries the process loaded (CUDA, HIP, ggml, ONNX, OpenCL, Level Zero, Vulkan,
 hint of what it uses, not proof). "By runtime" and "By engine" summarise the occupancy. AMD and Intel
 processes come from the DRM statistics in `/proc/<pid>/fdinfo`, NVIDIA processes from `nvidia-smi`;
 processes of other users cannot be inspected and are only counted. The combined view adds the cards up
-(memory, power) and draws one utilization line per GPU.
+(memory, power) and draws one utilization line per GPU. Per-process GPU data is collected only while the
+Processes or Performance page is open; a process that starts using the GPU can take a few seconds to appear.
+
+Resource use: RustyTM redraws only when something changed and keeps per-process details between
+samples, so it stays light while it runs (a few percent of one core and about 10 MB of memory).
 
 Update notice: when you quit, RustyTM prints a message on the standard output if crates.io has a newer
 version (the check runs in the background, times out after 2 seconds and says nothing if it fails).

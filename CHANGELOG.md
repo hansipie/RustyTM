@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.1 - 2026-11-04
+
+### Changed
+- Lower CPU use and fewer allocations while RustyTM runs:
+  - The screen is redrawn only after a key press, a resize, a new sample or progress of background work, instead of five times a second.
+  - Tables build only the rows that fit on screen.
+  - Per-process GPU data is collected only while the Processes or Performance page is open. Between full scans (every 5 passes), only known GPU clients and recently started processes are inspected.
+  - The process list keeps each process's command line, owner and user name between samples instead of reading them every time. It also no longer copies the whole list every sample, and is sorted once per frame.
+  - CPU frequencies are read once per sample, and `/proc/cpuinfo` only when sysfs lacks some of them. Flight Recorder samples are built only while recording.
+- Release build: one codegen unit and stripped symbols (smaller binary).
+
+### Fixed
+- The history of an unplugged disk, removed network interface or vanished sensor is freed after 120 samples without readings, instead of being kept until RustyTM quits.
+
 ## 1.5.0 - 2026-11-04
 
 ### Added
