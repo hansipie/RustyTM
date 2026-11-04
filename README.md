@@ -11,13 +11,13 @@
 [![Stars](https://img.shields.io/github/stars/hansipie/RustyTM?style=flat)](https://github.com/hansipie/RustyTM/stargazers)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/hansipie/RustyTM/main/docs/slideshow.svg" alt="RustyTM slideshow: Summary, Processes, Performance, System Info, Power &amp; Freq, Thermals, Battery, Drivers, Disk Space, Benchmarks" width="900">
+  <img src="https://raw.githubusercontent.com/hansipie/RustyTM/main/docs/slideshow.svg" alt="RustyTM slideshow: Summary, Processes, Performance, GPU, System Info, Power &amp; Freq, Thermals, Battery, Drivers, Disk Space, Benchmarks" width="900">
   <br>
   <sub>Slideshow of the main pages (rendered with <code>rustytm --dump=&lt;page&gt;</code>)</sub>
 </p>
 
 Task manager for Linux, written in Rust (terminal UI, ratatui). Original implementation: every
-collector reads `/proc`, `/sys`, `systemctl`, `loginctl`, `nvidia-smi` directly. No licence key, no
+collector reads `/proc` (including `/proc/<pid>/fdinfo` for per-process GPU usage), `/sys`, `systemctl`, `loginctl`, `nvidia-smi` directly. No licence key, no
 feature gating: all pages are enabled.
 
 ## Install
@@ -35,12 +35,27 @@ Or from source:
     ./target/release/rustytm --record=30     # headless Flight Recorder -> *.rustytmtrace
     ./target/release/rustytm --bench=cpu|disk|gpu|internet|all
 
-Pages: Summary, Processes (tree, signals, nice, affinity, details), Performance (CPU/memory/disks/
-network/GPU), App history, Startup apps, Users, Services, System Info (export; memory and Wi-Fi details), Power & Freq,
+Pages: Summary, Processes (tree, signals, nice, affinity, details, GPU and VRAM columns), Performance (CPU/memory/disks/
+network/GPU, see below), App history, Startup apps, Users, Services, System Info (export; memory and Wi-Fi details), Power & Freq,
 Thermals (one graph per temperature sensor: dashboard or single-sensor view, `↑↓` to cycle, `v` to switch, `f` for
 full screen), Battery (laptop and peripheral batteries: status, energy, power, health, cycles, charge and power graphs with a
 forecast to empty or full), Flight Recorder (record, save, validate, replay), Connections, Installed Apps (uninstall with `u`), Drivers (kernel
 modules), Disk Space (scanner), Benchmarks (CPU, disk, GPU, internet), Disk Health (SMART), Settings. Press `?` for keys.
+
+GPU page (Performance has one entry per GPU, and `c` switches to a single "All GPUs" entry):
+dedicated memory (VRAM) and shared memory (GTT) bars, with the VRAM bar split in coloured portions by runtime;
+utilization and memory history; clocks, power, temperature, video encode/decode, and for NVIDIA the
+performance state, PCIe link and throttle reasons. Per process: dedicated and shared memory and the
+load of each engine, grouped as 3D, Compute, Copy and Video, plus the runtime detected from the
+libraries the process loaded (CUDA, HIP, ggml, ONNX, OpenCL, Level Zero, Vulkan, OpenGL, Video; a
+hint of what it uses, not proof). "By runtime" and "By engine" summarise the occupancy. AMD and Intel
+processes come from the DRM statistics in `/proc/<pid>/fdinfo`, NVIDIA processes from `nvidia-smi`;
+processes of other users cannot be inspected and are only counted. The combined view adds the cards up
+(memory, power) and draws one utilization line per GPU.
+
+Update notice: when you quit, RustyTM prints a message on the standard output if crates.io has a newer
+version (the check runs in the background, times out after 2 seconds and says nothing if it fails).
+Set `RUSTYTM_NO_UPDATE_CHECK=1` to turn it off.
 
 Graphs share one look on every page (drawn with [tui-chart](https://crates.io/crates/tui-chart)):
 smoothed braille area charts, a green → amber → red fill by level for load and temperatures, one

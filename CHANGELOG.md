@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.5.0 - 2026-11-04
+
+### Added
+- Per-process GPU usage on the GPU page and in the process list. AMD and Intel are read from the DRM client statistics in `/proc/<pid>/fdinfo`; NVIDIA from `nvidia-smi`. For each process: dedicated memory, shared memory (GTT or system) and the load of each engine, grouped as 3D, Compute, Copy and Video. Processes of other users cannot be inspected and are counted in the title of the table.
+- GPU and VRAM columns in the process list, sortable like the other columns (`<` / `>`).
+- Runtime detected for each GPU process from its loaded libraries (CUDA, HIP, ggml, ONNX, OpenCL, Level Zero, Vulkan, OpenGL, Video). This shows which libraries a process loaded, not what it computes.
+- Update notice: RustyTM checks crates.io in the background and, when you quit, prints a message on the standard output if a newer version exists (run `rustytm update` to install it). Set `RUSTYTM_NO_UPDATE_CHECK` to turn the check off.
+- GPU page: a VRAM bar split in coloured portions by runtime, a shared memory (GTT) bar, "By runtime" and "By engine" tables, CPU-visible VRAM, memory controller activity, and for NVIDIA the performance state, PCIe link and clock throttle reasons.
+
+### Changed
+- GPU page layout: on terminals of 130 columns or more, the tables are on the left and the charts, bars and details in a fixed-width column on the right, with no empty areas. Narrower terminals stack the sections and drop columns to fit.
+- Combined GPU view ("All GPUs") now adds the cards up: memory, power and limits are summed, the hottest card sets the temperature, the utilization graph has one line per GPU and the memory graph covers all cards. Processes of every GPU are listed with their GPU number.
+- Process list columns are narrower so that the new GPU and VRAM columns fit in a 110-column terminal without cutting values.
+- Performance page: `g` and `K` only act on the CPU, and the key hints show only the keys that work for the selected device.
+
 ## 1.4.0 - 2026-10-30
 
 ### Added

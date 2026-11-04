@@ -103,6 +103,7 @@ fn main() {
         }
     }
     let mut a = App::new(s);
+    let upd = update::start_check();
     let mut term = ratatui::init();
     let res = (|| -> std::io::Result<()> {
         loop {
@@ -126,6 +127,7 @@ fn main() {
     })();
     ratatui::restore();
     a.persist_on_exit();
+    update::announce(upd);
     if let Err(e) = res {
         eprintln!("error: {e}");
         std::process::exit(1);

@@ -339,7 +339,7 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
         v[0],
         title,
         &hs,
-        &[Constraint::Min(18), Constraint::Length(8), Constraint::Length(8), Constraint::Length(10), Constraint::Length(11), Constraint::Length(11), Constraint::Length(12), Constraint::Length(9), Constraint::Length(7), Constraint::Length(6), Constraint::Length(10)],
+        &[Constraint::Min(14), Constraint::Length(7), Constraint::Length(7), Constraint::Length(9), Constraint::Length(10), Constraint::Length(10), Constraint::Length(9), Constraint::Length(9), Constraint::Length(7), Constraint::Length(5), Constraint::Length(9)],
         rows,
         cur,
         &mut off,
@@ -843,7 +843,7 @@ fn gpu_tables(f: &mut Frame, area: Rect, a: &App, g: &GpuStat, mine: &[&crate::c
     if bh >= 4 {
         let mut off2 = 0;
         if area.width >= 80 {
-            table(f, bottom[0], "By runtime".into(), &["Runtime", "Proc", "VRAM", "%VRAM", "Shared", "GPU"], &[Constraint::Length(10), Constraint::Length(4), Constraint::Length(9), Constraint::Length(6), Constraint::Min(8), Constraint::Length(5)], grows, usize::MAX, &mut off2, a);
+            table(f, bottom[0], "By runtime".into(), &["Runtime", "Proc", "VRAM", "%VRAM", "Shared", "GPU"], &[Constraint::Length(10), Constraint::Length(4), Constraint::Length(8), Constraint::Length(5), Constraint::Min(7), Constraint::Length(4)], grows, usize::MAX, &mut off2, a);
             let mut off3 = 0;
             table(f, bottom[1], "By engine".into(), &["Engine", "Process", "Load"], &[Constraint::Length(8), Constraint::Min(16), Constraint::Length(5)], erows, usize::MAX, &mut off3, a);
         } else {
@@ -1623,7 +1623,7 @@ fn overlays(f: &mut Frame, area: Rect, a: &App) {
         f.render_widget(Paragraph::new(vec![Line::from(text), Line::from(""), Line::from("y / Enter = yes     any other key = no")]).wrap(Wrap { trim: true }).block(block("Confirm", a)), r);
     }
     if a.help {
-        let text = "Pages:   Tab / Shift-Tab / [ ] / ← →\nQuit:    q or Ctrl-C        Filter: /  (Esc clears)\nSidebar: b                   Status bar: B\nRun new task: N              Help: ?\n\nProcesses:  ↑↓ PgUp PgDn  Enter details  x terminate (SIGTERM)  K kill (SIGKILL)\n            X terminate/force the whole tree (x then X)  p suspend  c continue\n            s send signal  n nice  a affinity  t tree  Space fold  E fold all\n            e show exited  v values/percent  < > sort column  o order  C copy cmdline\n            Y copy name  W search online  m write a sample report\n\nThermals:  ↑↓ / n p cycle sensors  v dashboard / single sensor  f or Enter full screen\n          (full screen: ←→ also cycle, Esc or f to leave)\n\nFlight Recorder:  r record  s save  d discard  Enter replay  Space play/pause  ,/. step\n                  PgUp/PgDn ±30 samples  x close replay\n\nDisk space:  Enter measure selected disk  c choose folder to measure\n\nBenchmarks:  a all  c cpu  d disk  g gpu  i internet  f folder  C clear history";
+        let text = "Pages:   Tab / Shift-Tab / [ ] / ← →\nQuit:    q or Ctrl-C        Filter: /  (Esc clears)\nSidebar: b                   Status bar: B\nRun new task: N              Help: ?\n\nProcesses:  ↑↓ PgUp PgDn  Enter details  x terminate (SIGTERM)  K kill (SIGKILL)\n            X terminate/force the whole tree (x then X)  p suspend  c continue\n            s send signal  n nice  a affinity  t tree  Space fold  E fold all\n            e show exited  v values/percent  < > sort column  o order  C copy cmdline\n            Y copy name  W search online  m write a sample report\n\nPerformance:  ↑↓ device  g CPU graph mode (CPU only)  K kernel times (CPU only)\n               c combine disks, networks and GPUs (All disks / All networks / All GPUs)\n\nThermals:  ↑↓ / n p cycle sensors  v dashboard / single sensor  f or Enter full screen\n          (full screen: ←→ also cycle, Esc or f to leave)\n\nFlight Recorder:  r record  s save  d discard  Enter replay  Space play/pause  ,/. step\n                  PgUp/PgDn ±30 samples  x close replay\n\nDisk space:  Enter measure selected disk  c choose folder to measure\n\nBenchmarks:  a all  c cpu  d disk  g gpu  i internet  f folder  C clear history";
         let w = text.lines().map(|l| l.chars().count()).max().unwrap_or(0) as u16 + 2;
         let r = centered(area, w, text.lines().count() as u16 + 2);
         f.render_widget(Clear, r);

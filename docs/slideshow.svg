@@ -2,14 +2,14 @@
 <style>
 text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill:#d4d4d4;white-space:pre}
 .t{font-family:system-ui,sans-serif;font-size:18px;font-weight:600;fill:#fff}
-.s{opacity:0;animation:show 35.0s infinite}
-@keyframes show{0%{opacity:0}1.20%{opacity:1}8.80%{opacity:1}10.00%{opacity:0}100%{opacity:0}}
+.s{opacity:0;animation:show 38.5s infinite}
+@keyframes show{0%{opacity:0}1.09%{opacity:1}8.00%{opacity:1}9.09%{opacity:0}100%{opacity:0}}
 </style>
 <rect width="964" height="616" rx="10" fill="#1e1e1e"/>
 <rect width="964" height="34" rx="10" fill="#2d2d2d"/>
 <circle cx="18" cy="17" r="6" fill="#ff5f56"/><circle cx="38" cy="17" r="6" fill="#ffbd2e"/><circle cx="58" cy="17" r="6" fill="#27c93f"/>
 <g class="s" style="animation-delay:0.0s">
-<text class="t" x="20" y="52">1/10 · Summary</text>
+<text class="t" x="20" y="52">1/11 · Summary</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ CPU 41% — AMD Ryzen 7 5800H with Radeon Gr┐┌ Memory 23.1 GB / 30.8 GB (75%) ───────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││100%│                                      ││100%│                                      │</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││    │                                      ││    │                                     ⠍│</text>
@@ -44,42 +44,42 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">Tab/←→ pages  ? help  q quit                                              CPU 41%  MEM 23.1 GB  Up 0:23:53:27</text>
 </g>
 <g class="s" style="animation-delay:3.5s">
-<text class="t" x="20" y="52">2/10 · Processes</text>
-<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Processes — 560 total CPU 28% (560) ───────────────────────────────────────────────────┐</text>
-<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Name               PID      CPU ▼    Memory   Disk rea Disk wr User     Status   Threads│</text>
-<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││llama-server       627907   21.5%    2.3 GB   -        -       hansi    Running  31     │</text>
-<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Performance      ││rustytm            790682   2.3%     10.5 MB  -        -       hansi    Running  2      │</text>
-<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ App history      ││ollama             2981     1.9%     37.9 MB  -        -       hansi    Sleeping 22     │</text>
-<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Startup apps     ││claude             700519   1.0%     429 MB   -        -       hansi    Sleeping 30     │</text>
-<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Users            ││hermes             2979     0.9%     450 MB   -        -       hansi    Sleeping 62     │</text>
-<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Services         ││ecotokens          424664   0.6%     4.3 GB   346 KB/s -       hansi    Sleeping 25     │</text>
-<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ System Info      ││omniroute (v16.    11228    0.5%     302 MB   -        -       hansi    Sleeping 12     │</text>
-<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Power &amp; Freq     ││nvidia-powerd      2605     0.0%     7.2 MB   -        -       root     Sleeping 5      │</text>
-<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Thermals         ││steamwebhelper     137731   0.0%     356 MB   -        -       hansi    Sleeping 12     │</text>
-<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Battery          ││ghostty            18084    0.0%     153 MB   -        -       hansi    Sleeping 46     │</text>
-<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Flight Recorder  ││gnome-shell        9940     0.0%     239 MB   -        -       hansi    Sleeping 39     │</text>
-<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Connections      ││WebExtensions      13557    0.0%     920 MB   -        -       hansi    Sleeping 28     │</text>
-<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Installed Apps   ││steamwebhelper     137688   0.0%     271 MB   -        -       hansi    Sleeping 24     │</text>
-<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Drivers          ││systemd-journal    832      0.0%     283 MB   -        -       root     Sleeping 1      │</text>
-<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Space       ││upowerd            2280     0.0%     11.2 MB  -        -       root     Sleeping 4      │</text>
-<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Benchmarks       ││systemd-logind     2446     0.0%     10.5 MB  -        -       root     Sleeping 1      │</text>
-<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk Health      ││tailscaled         2623     0.0%     29.9 MB  -        -       root     Sleeping 23     │</text>
-<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Settings         ││cloud-drive-ui     11302    0.0%     14.1 MB  -        -       hansi    Sleeping 13     │</text>
-<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││claude             19767    0.0%     434 MB   -        -       hansi    Sleeping 22     │</text>
-<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││steam              137199   0.0%     107 MB   -        -       hansi    Sleeping 49     │</text>
-<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Isolated Web Co    601057   0.0%     200 MB   -        -       hansi    Sleeping 28     │</text>
-<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Isolated Web Co    601680   0.0%     632 MB   -        -       hansi    Sleeping 34     │</text>
-<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Isolated Web Co    778491   0.0%     602 MB   -        -       hansi    Sleeping 31     │</text>
-<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││Isolated Web Co    782168   0.0%     381 MB   -        -       hansi    Sleeping 30     │</text>
-<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
-<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  │┌ Selection ─────────────────────────────────────────────────────────────────────────────┐</text>
-<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││PID 627907  PPID 2981  nice 0  hansi  Running                                           │</text>
-<text x="20" y="569" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                  ││/var/usrlocal/lib/ollama/llama-server --model                                           │</text>
-<text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
-<text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">Enter details  x terminate  X tree  K kill  p/c stop/cont  s signal  n ni CPU 28%  MEM 23.1 GB  Up 0:23:53:28</text>
+<text class="t" x="20" y="52">2/11 · Processes</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ Processes — 518 total CPU 7% (518) ────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│Name             PID     CPU     Memory    Disk read  Disk write User      Status    Threads GPU   VRAM ▼   │</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│gnome-shell      5866    0.4%    274 MB    -          -          hansi     Sleeping  38      2%    252 MB   │</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│frontrise        78276   0.3%    205 MB    -          -          hansi     Sleeping  79      8%    96.3 MB  │</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ghostty          10324   0.2%    231 MB    -          -          hansi     Sleeping  44      2%    93.4 MB  │</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│firefox-bin      18650   0.0%    621 MB    -          -          hansi     Sleeping  134     0%    33.0 MB  │</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│Xwayland         6360    0.0%    67.9 MB   -          -          hansi     Sleeping  10      0%    10.3 MB  │</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│mutter-x11-fram  7399    0.0%    79.2 MB   -          -          hansi     Sleeping  13      -     6.0 MB   │</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│RDD Process      18784   0.0%    82.1 MB   -          -          hansi     Sleeping  12      0%    4.1 MB   │</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ibus-x11         7379    0.0%    44.7 MB   -          -          hansi     Sleeping  8       -     12.0 KB  │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│systemd          1       0.0%    16.5 MB   -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kthreadd         2       0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│pool_workqueue_r 3       0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kworker/R-rcu_gp 4       0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kworker/R-sync_w 5       0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kworker/R-kvfree 6       0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kworker/R-slub_f 7       0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kworker/R-netns  8       0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kworker/0:0H-kbl 10      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kworker/R-mm_per 13      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ksoftirqd/0      15      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│rcu_preempt      16      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│rcu_exp_par_gp_k 17      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│rcu_exp_gp_kthre 18      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│migration/0      19      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│kprobe-optimizer 20      0.0%    0 B       -          -          root      Sleeping  1       -     -        │</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ Selection ─────────────────────────────────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">│PID 5866  PPID 2850  nice 0  hansi  Sleeping                                                                │</text>
+<text x="20" y="569" textLength="924" lengthAdjust="spacing" xml:space="preserve">│/usr/bin/gnome-shell --mode=user                                                                            │</text>
+<text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">Enter details  x terminate  X tree  K kill  p/c stop/cont  s signal  n nic CPU 7%  MEM 14.9 GB  Up 0:10:29:26 </text>
 </g>
 <g class="s" style="animation-delay:7.0s">
-<text class="t" x="20" y="52">3/10 · Performance</text>
+<text class="t" x="20" y="52">3/11 · Performance</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Performance ─────────┐┌ CPU — AMD Ryzen 7 5800H with Radeon Graphics ──────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││ CPU              50% ││100%│···························································│</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││ Memory           75% ││    │                                                           │</text>
@@ -114,7 +114,42 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">↑↓ device  g graph mode  K kernel times  c combined  ? help               CPU 50%  MEM 23.1 GB  Up 0:23:53:30</text>
 </g>
 <g class="s" style="animation-delay:10.5s">
-<text class="t" x="20" y="52">4/10 · System Info</text>
+<text class="t" x="20" y="52">4/11 · GPU</text>
+<text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ Performance ─────────┐┌ AMD graphics (amdgpu) — utilization 6% ─┐┌ GPU memory in use 90% ──────────────────┐</text>
+<text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ CPU              11% ││100%│                                    ││100%│                               ⠐⠖⠖⠖⠖│</text>
+<text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Memory           48% ││    │                                    ││    │                                ⠅⠅⠅⠅│</text>
+<text x="20" y="127" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk nvme0n1      1% ││ 50%│                                    ││ 50%│                                ⠅⠅⠅⠅│</text>
+<text x="20" y="144" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Disk nvme1n1      0% ││  0%│                               ⠠⠤⠤⠤⠤││  0%│                                ⠅⠅⠅⠅│</text>
+<text x="20" y="161" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Network enp2s0       ││    └────────────────────────────────────││    └────────────────────────────────────│</text>
+<text x="20" y="178" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Wi-Fi wlp3s0         │└ min 6%  max 10%  avg 7% ────────────────┘└ min 90%  max 90%  avg 90% ──────────────┘</text>
+<text x="20" y="195" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Network tailscale0   │┌ VRAM 464 MB / 512 MB  91% ──────────────┐┌ Shared (GTT) ───────────────────────────┐</text>
+<text x="20" y="212" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Network podman0      ││████████████████████████████████████████░││▊░░░░░░░░░░░░░░░░░░░ 633 MB / 15.4 GB  4%│</text>
+<text x="20" y="229" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Network veth0        ││■ CUDA 96.3 MB (19%)  ■ Vulkan 350 MB (68││                                         │</text>
+<text x="20" y="246" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ GPU 0 NVIDIA      0% │└─────────────────────────────────────────┘└─────────────────────────────────────────┘</text>
+<text x="20" y="263" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ GPU 1 AMD         6% │┌ GPU details ───────────────────────────────────────────────────────────────────────┐</text>
+<text x="20" y="280" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Driver / PCI              amdgpu / 0000:06:00.0                                     │</text>
+<text x="20" y="297" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││CPU-visible VRAM          464 MB / 512 MB                                           │</text>
+<text x="20" y="314" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Graphics clock / max      400 MHz / n/a                                             │</text>
+<text x="20" y="331" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Power draw / limit        33 W / n/a                                                │</text>
+<text x="20" y="348" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Temperature               48°C                                                      │</text>
+<text x="20" y="365" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      │└────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="382" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      │┌ GPU processes — 352 not inspectable (8) ───────────────────────────────────────────┐</text>
+<text x="20" y="399" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Runtime  Name                       Dedic.   Shared   GPU  Engines                  │</text>
+<text x="20" y="416" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││CUDA     frontrise                  96.3 MB  102 MB   8%   dec 8%  gfx 4%           │</text>
+<text x="20" y="433" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Vulkan   gnome-shell                250 MB   183 MB   2%   gfx 2%                   │</text>
+<text x="20" y="450" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Vulkan   ghostty                    93.4 MB  93.2 MB  1%   gfx 1%                   │</text>
+<text x="20" y="467" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Vulkan   mutter-x11-fram            6.0 MB   4.0 MB   n/a  n/a                      │</text>
+<text x="20" y="484" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││OpenGL   firefox-bin                33.0 MB  274 MB   0%                            │</text>
+<text x="20" y="501" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      │└────────────────────────────────────────────────────────────────────────────────────┘</text>
+<text x="20" y="518" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      │┌ By runtime (3) ───────────────────────────┐┌ By engine (8) ────────────────────────┐</text>
+<text x="20" y="535" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Runtime    Proc VRAM     %VRAM Shared  GPU ││Engine   Process                  Load │</text>
+<text x="20" y="552" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││CUDA       1    96.3 MB  19%   102 MB  8%  ││3D       3 proc.                  6%   │</text>
+<text x="20" y="569" textLength="924" lengthAdjust="spacing" xml:space="preserve">│                      ││Vulkan     3    350 MB   68%   280 MB  2%  ││           frontrise (78276)      4%   │</text>
+<text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────────┘└───────────────────────────────────────────┘└───────────────────────────────────────┘</text>
+<text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">↑↓ device  c combined  ? help                                             CPU 11%  MEM 14.8 GB  Up 0:10:30:18 </text>
+</g>
+<g class="s" style="animation-delay:14.0s">
+<text class="t" x="20" y="52">5/11 · System Info</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ System Info ───────────────────────────────────────────────────────────────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Hardware Overview                                                                       │</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││  Machine                       ASUSTeK COMPUTER INC. ROG Strix G713QR_G713QR           │</text>
@@ -148,8 +183,8 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">↑↓ scroll  E export  r reload                                             CPU 47%  MEM 23.2 GB  Up 0:23:53:36</text>
 </g>
-<g class="s" style="animation-delay:14.0s">
-<text class="t" x="20" y="52">5/10 · Power &amp; Freq</text>
+<g class="s" style="animation-delay:17.5s">
+<text class="t" x="20" y="52">6/11 · Power &amp; Freq</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Power &amp; Freq — power and frequency sensors (48) ───────────────────────────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Group                  Device                    Sensor                   Value         │</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││Temperatures           acpitz                    temp1                    96°C          │</text>
@@ -183,8 +218,8 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">Tab/←→ pages  ? help  q quit                                              CPU 54%  MEM 23.2 GB  Up 0:23:53:37</text>
 </g>
-<g class="s" style="animation-delay:17.5s">
-<text class="t" x="20" y="52">6/10 · Thermals</text>
+<g class="s" style="animation-delay:21.0s">
+<text class="t" x="20" y="52">7/11 · Thermals</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Thermals — dashboard — hottest k10temp / Tctl 96°C ────────────────────────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││┏ acpitz / temp1 ━━━━━━━━━━━━━━━━━━━━ 96°C ┓┌ mt7921_phy0 / temp1 ─────────────── 44°C ┐│</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││┃102°C│                                    ┃│50°C│                                     ││</text>
@@ -218,8 +253,8 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────── 1/12 ┘</text>
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">↑↓ sensor  v dashboard/single  f/Enter full screen  / filter              CPU 45%  MEM 23.2 GB  Up 0:23:53:39</text>
 </g>
-<g class="s" style="animation-delay:21.0s">
-<text class="t" x="20" y="52">7/10 · Battery</text>
+<g class="s" style="animation-delay:24.5s">
+<text class="t" x="20" y="52">8/11 · Battery</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Battery — not charging ────────────────────────────────────────────────────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Battery                   BAT0 [1/2] (internal)  AS3GWAF3KC GA50358                     │</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││Status                    Not charging — AC connected                                   │</text>
@@ -253,8 +288,8 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└ min 0.0 W  max 0.0 W  avg 0.0 W ───────────────────────────────────────────────────────┘</text>
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">↑↓ battery  (the graphs fill in as time passes; forecast = current power  CPU 48%  MEM 23.2 GB  Up 0:23:53:40</text>
 </g>
-<g class="s" style="animation-delay:24.5s">
-<text class="t" x="20" y="52">8/10 · Drivers</text>
+<g class="s" style="animation-delay:28.0s">
+<text class="t" x="20" y="52">9/11 · Drivers</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Kernel memory ─────────────────────────────────────────────────────────────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Kernel modules for Linux 7.2.11-ogc4.1.fc44.x86_64 — 188 loaded, 5437 known. Module memo│</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││                                                                                        │</text>
@@ -288,8 +323,8 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘</text>
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">Enter details  l loaded only  r reload  / filter                          CPU 45%  MEM 22.9 GB  Up 0:23:53:41</text>
 </g>
-<g class="s" style="animation-delay:28.0s">
-<text class="t" x="20" y="52">9/10 · Disk Space</text>
+<g class="s" style="animation-delay:31.5s">
+<text class="t" x="20" y="52">10/11 · Disk Space</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ All Disks — 3 mounted filesystems (3) ─────────────────────────────────────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││Mount               Type     Usage                                                      │</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        ││/etc                btrfs    1.0 TB of 1.8 TB used, 787 GB free   ███████████▌░░░░░░░░  │</text>
@@ -323,8 +358,8 @@ text{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;font-size:14px;fill
 <text x="20" y="586" textLength="924" lengthAdjust="spacing" xml:space="preserve">└──────────────────┘└──────────────────────────────────────────────────────┘└────────────────────────────────┘</text>
 <text x="20" y="603" textLength="924" lengthAdjust="spacing" xml:space="preserve">Enter scan mount  c choose folder  Space pause  x stop  v view            CPU 59%  MEM 23.0 GB  Up 0:23:53:43</text>
 </g>
-<g class="s" style="animation-delay:31.5s">
-<text class="t" x="20" y="52">10/10 · Benchmarks</text>
+<g class="s" style="animation-delay:35.0s">
+<text class="t" x="20" y="52">11/11 · Benchmarks</text>
 <text x="20" y="76" textLength="924" lengthAdjust="spacing" xml:space="preserve">┌ RustyTM ─────────┐┌ Benchmark progress — Ready ────────────────────────────────────────────────────────────┐</text>
 <text x="20" y="93" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Summary          ││░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%│</text>
 <text x="20" y="110" textLength="924" lengthAdjust="spacing" xml:space="preserve">│ Processes        │└────────────────────────────────────────────────────────────────────────────────────────┘</text>
