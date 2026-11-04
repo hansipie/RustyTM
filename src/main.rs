@@ -108,6 +108,7 @@ fn main() {
     let res = (|| -> std::io::Result<()> {
         // Redraw only when something may have changed: input, resize, a sample, or live progress.
         let mut dirty = true;
+        let mut was_busy = false;
         loop {
             if dirty {
                 term.draw(|f| draw::draw(f, &mut a))?;
@@ -129,10 +130,15 @@ fn main() {
                 a.tick();
                 dirty = true;
             }
-            // background work reports progress between samples
-            if a.bench.running() || a.scanner.running() || a.loading(a.page) {
+            // background work reports progress between samples; redraw once more when it finishes
+            if a.sync_gpu_procs() {
                 dirty = true;
             }
+            let busy = a.bench.running() || a.scanner.running() || a.loading(a.page);
+            if busy || was_busy {
+                dirty = true;
+            }
+            was_busy = busy;
             if a.quit {
                 return Ok(());
             }

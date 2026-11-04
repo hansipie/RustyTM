@@ -204,6 +204,13 @@ pub struct GpuProcSampler {
 const FULL_SCAN_EVERY: u32 = 5;
 
 impl GpuProcSampler {
+    /// Call when sampling restarts after a pause: forget the rate baselines (they would be averaged over
+    /// the whole pause) and make the next pass a full discovery scan.
+    pub fn resume(&mut self) {
+        self.prev.clear();
+        self.cycle = 0;
+    }
+
     pub fn sample(&mut self) -> GpuProcSnap {
         let mut snap = GpuProcSnap::default();
         let mut agg: HashMap<(u32, String), GpuProc> = HashMap::new();

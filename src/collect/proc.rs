@@ -83,6 +83,7 @@ fn parse_stat(txt: &str) -> Option<(String, Vec<&str>)> {
 /// Per-process data that does not change during the life of a PID (identified by its start time).
 struct Meta {
     start: u64,
+    name: String,
     uid: u32,
     user: String,
     cmdline: String,
@@ -143,15 +144,22 @@ impl ProcSampler {
                 let start: u64 = f[19].parse().unwrap_or(0);
                 let m = match self.meta.remove(&pid) {
                     Some(mut m) if m.start == start => {
-                        if refresh_cmd {
+                        // ownership can change (privilege drop) and exec() keeps the PID: re-check both cheaply
+                        let uid = std::fs::metadata(&base).map(|m| m.uid()).unwrap_or(m.uid);
+                        if uid != m.uid {
+                            m.uid = uid;
+                            m.user = self.users.get(&uid).cloned().unwrap_or_else(|| uid.to_string());
+                        }
+                        if refresh_cmd || m.name != name {
                             m.cmdline = read_cmdline(&base);
+                            m.name = name.clone();
                         }
                         m
                     }
                     _ => {
                         let uid = std::fs::metadata(&base).map(|m| m.uid()).unwrap_or(0);
                         let user = self.users.get(&uid).cloned().unwrap_or_else(|| uid.to_string());
-                        Meta { start, uid, user, cmdline: read_cmdline(&base) }
+                        Meta { start, name: name.clone(), uid, user, cmdline: read_cmdline(&base) }
                     }
                 };
                 let (mut rb, mut wb) = (0u64, 0u64);

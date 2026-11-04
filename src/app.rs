@@ -192,6 +192,7 @@ pub struct App {
     pub hist: Hist,
     pub dh: HashMap<String, VecDeque<u64>>,
     dh_tick: u32,
+    dh_seen: HashMap<String, u32>,
     pub perf_dev: usize,
     pub cpu_graph: CpuGraph,
     pub show_kernel: bool,
@@ -282,10 +283,16 @@ impl App {
             let wanted = gpu_procs_wanted.clone();
             std::thread::spawn(move || {
                 let mut sampler = crate::collect::gpuproc::GpuProcSampler::default();
+                let mut paused = true;
                 loop {
                     if !wanted.load(Ordering::Relaxed) {
+                        paused = true;
                         std::thread::sleep(Duration::from_millis(250));
                         continue;
+                    }
+                    if paused {
+                        sampler.resume();
+                        paused = false;
                     }
                     let v = Arc::new(sampler.sample());
                     if let Ok(mut x) = g.lock() {
@@ -338,6 +345,7 @@ impl App {
             hist: Hist::default(),
             dh: HashMap::new(),
             dh_tick: 0,
+            dh_seen: HashMap::new(),
             perf_dev: 0,
             cpu_graph: CpuGraph::Overall,
             show_kernel: false,
@@ -393,6 +401,22 @@ impl App {
         a
     }
 
+    /// Tells the per-process GPU worker whether the current page needs its data.
+    fn sync_gpu_demand(&self) {
+        self.gpu_procs_wanted.store(matches!(self.page, P_PROCESSES | P_PERF), Ordering::Relaxed);
+    }
+
+    /// Picks up the worker's latest snapshot; true when it changed since the last call.
+    pub fn sync_gpu_procs(&mut self) -> bool {
+        if let Ok(g) = self.gpu_procs.lock() {
+            if !Arc::ptr_eq(&g, &self.gpu_procs_now) {
+                self.gpu_procs_now = g.clone();
+                return true;
+            }
+        }
+        false
+    }
+
     /// Live processes of the last sample.
     pub fn procs(&self) -> &[Proc] {
         &self.plist[..self.n_live]
@@ -423,7 +447,7 @@ impl App {
     pub fn tick(&mut self) {
         self.last_tick = Instant::now();
         // per-process GPU data is only shown on these pages
-        self.gpu_procs_wanted.store(matches!(self.page, P_PROCESSES | P_PERF), Ordering::Relaxed);
+        self.sync_gpu_demand();
         // the run appends to the history file when it ends
         let running = self.bench.running();
         if self.bench_was_running && !running {
@@ -438,9 +462,7 @@ impl App {
         if let Ok(g) = self.gpus.lock() {
             self.gpu_now = g.clone();
         }
-        if let Ok(g) = self.gpu_procs.lock() {
-            self.gpu_procs_now = g.clone();
-        }
+        self.sync_gpu_procs();
         let set = sensors(&mut self.rapl, &self.freqs, &self.gpu_now);
         self.sensors = set.sensors;
         self.restricted = set.restricted;
@@ -475,12 +497,21 @@ impl App {
         }
         // every 60 ticks, drop histories of devices that disappeared (unplugged disk, removed interface...)
         self.dh_tick = self.dh_tick.wrapping_add(1);
-        if self.dh_tick % 60 == 0 {
-            let current: HashSet<&str> = dh.iter().map(|(k, _)| k.as_str()).collect();
-            self.dh.retain(|k, _| current.contains(k.as_str()));
-        }
         for (k, v) in dh {
+            match self.dh_seen.get_mut(&k) {
+                Some(t) => *t = self.dh_tick,
+                None => {
+                    self.dh_seen.insert(k.clone(), self.dh_tick);
+                }
+            }
             push(self.dh.entry(k).or_default(), v);
+        }
+        // forget a history only after the device has been absent for 2 minutes (one missed read is not a removal)
+        if self.dh_tick % 60 == 0 {
+            let now = self.dh_tick;
+            self.dh_seen.retain(|_, t| now.wrapping_sub(*t) <= 120);
+            let seen = &self.dh_seen;
+            self.dh.retain(|k, _| seen.contains_key(k));
         }
         self.sample_battery();
         self.record_sample();
@@ -723,6 +754,7 @@ impl App {
 
     pub fn goto(&mut self, p: usize) {
         self.page = p % PAGES.len();
+        self.sync_gpu_demand();
         self.thermal_full = false;
         self.enter_page();
     }
