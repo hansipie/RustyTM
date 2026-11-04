@@ -286,6 +286,12 @@ impl App {
                 let mut paused = true;
                 loop {
                     if !wanted.load(Ordering::Relaxed) {
+                        if !paused {
+                            // never show the last session's processes when the page is opened again
+                            if let Ok(mut x) = g.lock() {
+                                *x = Arc::new(Default::default());
+                            }
+                        }
                         paused = true;
                         std::thread::sleep(Duration::from_millis(250));
                         continue;
@@ -506,7 +512,7 @@ impl App {
             }
             push(self.dh.entry(k).or_default(), v);
         }
-        // forget a history only after the device has been absent for 2 minutes (one missed read is not a removal)
+        // forget a history only after the device has been absent for 120 samples (one missed read is not a removal)
         if self.dh_tick % 60 == 0 {
             let now = self.dh_tick;
             self.dh_seen.retain(|_, t| now.wrapping_sub(*t) <= 120);

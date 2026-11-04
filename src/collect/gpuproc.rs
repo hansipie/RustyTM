@@ -196,7 +196,7 @@ pub struct GpuProcSampler {
     runtimes: HashMap<u32, &'static str>,
     /// PIDs that held a DRM descriptor at the last full scan; rescanned every cycle.
     drm_pids: HashSet<u32>,
-    /// Every PID listed in /proc at the previous pass: a PID missing from it is new and gets scanned at once.
+    /// Every PID listed in /proc at the last full scan: a PID missing from it is new and is scanned every pass.
     known_pids: HashSet<u32>,
     cycle: u32,
     restricted: usize,
@@ -295,7 +295,11 @@ impl GpuProcSampler {
             self.restricted = restricted;
         }
         snap.restricted = self.restricted;
-        self.known_pids = alive;
+        // only full scans mark PIDs as known: a process started since then is re-read every pass
+        // until the next full scan, so one that opens the GPU a moment after starting is still caught
+        if full {
+            self.known_pids = alive;
+        }
         self.drm_pids = if full { drm_pids } else { self.drm_pids.union(&drm_pids).copied().collect() };
         snap.procs = agg.into_values().collect();
         nvidia(&mut snap);
