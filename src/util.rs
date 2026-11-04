@@ -3,7 +3,14 @@ use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
 pub fn read(p: &str) -> Option<String> {
-    std::fs::read_to_string(p).ok().map(|s| s.trim().to_string())
+    let mut s = std::fs::read_to_string(p).ok()?;
+    // trim in place: no second allocation
+    s.truncate(s.trim_end().len());
+    let lead = s.len() - s.trim_start().len();
+    if lead > 0 {
+        s.drain(..lead);
+    }
+    Some(s)
 }
 
 pub fn read_u64(p: &str) -> Option<u64> {

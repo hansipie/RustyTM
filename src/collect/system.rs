@@ -144,14 +144,18 @@ impl CpuSampler {
 
 /// Current frequency per logical CPU in MHz.
 pub fn cpu_freqs(n: usize) -> Vec<f64> {
-    let mut v = Vec::with_capacity(n);
-    let info = read("/proc/cpuinfo").unwrap_or_default();
-    let fallback: Vec<f64> = info.lines().filter(|l| l.starts_with("cpu MHz")).filter_map(|l| l.split_once(':')?.1.trim().parse().ok()).collect();
-    for i in 0..n {
-        let f = read_f64(&format!("/sys/devices/system/cpu/cpu{i}/cpufreq/scaling_cur_freq")).map(|k| k / 1000.0).or_else(|| fallback.get(i).copied()).unwrap_or(0.0);
-        v.push(f);
+    let mut v: Vec<Option<f64>> = (0..n).map(|i| read_f64(&format!("/sys/devices/system/cpu/cpu{i}/cpufreq/scaling_cur_freq")).map(|k| k / 1000.0)).collect();
+    // /proc/cpuinfo is large: parse it only when sysfs misses some CPUs
+    if v.iter().any(Option::is_none) {
+        let info = read("/proc/cpuinfo").unwrap_or_default();
+        let fallback: Vec<f64> = info.lines().filter(|l| l.starts_with("cpu MHz")).filter_map(|l| l.split_once(':')?.1.trim().parse().ok()).collect();
+        for (i, f) in v.iter_mut().enumerate() {
+            if f.is_none() {
+                *f = fallback.get(i).copied();
+            }
+        }
     }
-    v
+    v.into_iter().map(|f| f.unwrap_or(0.0)).collect()
 }
 
 // ───────────────────────────── Memory ─────────────────────────────
@@ -639,7 +643,7 @@ impl Rapl {
     }
 }
 
-pub fn sensors(rapl: &mut Rapl, logical: usize, gpu_list: &[GpuStat]) -> SensorSet {
+pub fn sensors(rapl: &mut Rapl, freqs: &[f64], gpu_list: &[GpuStat]) -> SensorSet {
     let mut s = Vec::new();
     if let Ok(rd) = std::fs::read_dir("/sys/class/hwmon") {
         let mut dirs: Vec<_> = rd.flatten().collect();
@@ -687,7 +691,7 @@ pub fn sensors(rapl: &mut Rapl, logical: usize, gpu_list: &[GpuStat]) -> SensorS
             }
         }
     }
-    for (i, f) in cpu_freqs(logical).into_iter().enumerate() {
+    for (i, &f) in freqs.iter().enumerate() {
         if f > 0.0 {
             s.push(Sensor { group: "Clocks", device: "cpufreq".into(), label: format!("Core {i} clock"), value: f, unit: "MHz" });
         }

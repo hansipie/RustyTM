@@ -191,6 +191,7 @@ pub struct App {
     smooth: HashMap<i32, f32>,
     pub hist: Hist,
     pub dh: HashMap<String, VecDeque<u64>>,
+    dh_tick: u32,
     pub perf_dev: usize,
     pub cpu_graph: CpuGraph,
     pub show_kernel: bool,
@@ -336,6 +337,7 @@ impl App {
             smooth: HashMap::new(),
             hist: Hist::default(),
             dh: HashMap::new(),
+            dh_tick: 0,
             perf_dev: 0,
             cpu_graph: CpuGraph::Overall,
             show_kernel: false,
@@ -439,7 +441,7 @@ impl App {
         if let Ok(g) = self.gpu_procs.lock() {
             self.gpu_procs_now = g.clone();
         }
-        let set = sensors(&mut self.rapl, self.cpu_static.logical, &self.gpu_now);
+        let set = sensors(&mut self.rapl, &self.freqs, &self.gpu_now);
         self.sensors = set.sensors;
         self.restricted = set.restricted;
         self.sample_procs();
@@ -470,6 +472,12 @@ impl App {
         }
         for t in self.thermals() {
             dh.push((t.key, (t.celsius.max(0.0) * 10.0).round() as u64));
+        }
+        // every 60 ticks, drop histories of devices that disappeared (unplugged disk, removed interface...)
+        self.dh_tick = self.dh_tick.wrapping_add(1);
+        if self.dh_tick % 60 == 0 {
+            let current: HashSet<&str> = dh.iter().map(|(k, _)| k.as_str()).collect();
+            self.dh.retain(|k, _| current.contains(k.as_str()));
         }
         for (k, v) in dh {
             push(self.dh.entry(k).or_default(), v);
@@ -564,6 +572,9 @@ impl App {
     }
 
     fn record_sample(&mut self) {
+        if !self.rec.as_ref().is_some_and(|r| r.active) {
+            return;
+        }
         let temps = self.rec_temps();
         let gpu: Vec<f32> = self.gpu_now.iter().map(|g| g.util.unwrap_or(0.0)).collect();
         let power = self.sensors.iter().find(|s| s.label.contains("package")).map(|s| s.value as f32);

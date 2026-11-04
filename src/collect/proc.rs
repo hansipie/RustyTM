@@ -236,11 +236,12 @@ pub fn descendants(procs: &[Proc], pid: i32) -> Vec<i32> {
         children.entry(p.ppid).or_default().push(p.pid);
     }
     let mut out = Vec::new();
+    let mut seen: std::collections::HashSet<i32> = std::collections::HashSet::new();
     let mut stack = vec![pid];
     while let Some(p) = stack.pop() {
         if let Some(ch) = children.get(&p) {
             for &c in ch {
-                if c != pid && !out.contains(&c) {
+                if c != pid && seen.insert(c) {
                     out.push(c);
                     stack.push(c);
                 }
