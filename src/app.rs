@@ -177,6 +177,8 @@ pub struct App {
     pub nets: Vec<NetStat>,
     pub gpus: Arc<Mutex<Vec<GpuStat>>>,
     pub gpu_now: Vec<GpuStat>,
+    pub gpu_procs: Arc<Mutex<crate::collect::gpuproc::GpuProcSnap>>,
+    pub gpu_procs_now: crate::collect::gpuproc::GpuProcSnap,
     pub sensors: Vec<Sensor>,
     pub restricted: Vec<String>,
     pub procs: Vec<Proc>,
@@ -267,6 +269,21 @@ impl App {
                 }
             });
         }
+        // per-process GPU usage on its own thread: scanning /proc and calling nvidia-smi is slow
+        let gpu_procs = Arc::new(Mutex::new(crate::collect::gpuproc::GpuProcSnap::default()));
+        {
+            let g = gpu_procs.clone();
+            std::thread::spawn(move || {
+                let mut sampler = crate::collect::gpuproc::GpuProcSampler::default();
+                loop {
+                    let v = sampler.sample();
+                    if let Ok(mut x) = g.lock() {
+                        *x = v;
+                    }
+                    std::thread::sleep(Duration::from_millis(1500));
+                }
+            });
+        }
         let bench_dir = if s.bench_dir.is_empty() { std::env::temp_dir() } else { PathBuf::from(&s.bench_dir) };
         let collapsed = s.collapsed.iter().copied().collect();
         let page = s.last_page.min(PAGES.len() - 1);
@@ -298,6 +315,8 @@ impl App {
             nets: vec![],
             gpus,
             gpu_now: vec![],
+            gpu_procs,
+            gpu_procs_now: Default::default(),
             sensors: vec![],
             restricted: vec![],
             procs: vec![],
@@ -398,6 +417,9 @@ impl App {
         self.nets = self.net_sampler.sample();
         if let Ok(g) = self.gpus.lock() {
             self.gpu_now = g.clone();
+        }
+        if let Ok(g) = self.gpu_procs.lock() {
+            self.gpu_procs_now = g.clone();
         }
         let set = sensors(&mut self.rapl, self.cpu_static.logical, &self.gpu_now);
         self.sensors = set.sensors;

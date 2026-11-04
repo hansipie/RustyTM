@@ -96,6 +96,11 @@ impl Palette {
         })
     }
 
+    /// Color of a battery charge: the level scale reversed, red when empty and green when full.
+    pub fn charge(&self, p: f64) -> Rgb {
+        self.heat(100.0 - p)
+    }
+
     /// Continuous level color, for gradients: green up to 40, amber at 65, red from 90.
     fn heat(&self, p: f64) -> Rgb {
         let stops = [(40.0, self.ok), (65.0, self.warn), (90.0, self.crit)];
@@ -130,6 +135,11 @@ fn mix(a: Rgb, b: Rgb, t: f64) -> Rgb {
     (m(a.0, b.0), m(a.1, b.1), m(a.2, b.2))
 }
 
+/// Color of a battery charge in percent: red at 0 %, green at 100 %.
+pub fn charge_hue(a: &App, p: f64) -> Rgb {
+    Palette::of(a).charge(p)
+}
+
 /// Level color of a reading (percent of capacity, or °C), shared by charts, meters and lists.
 pub fn level(a: &App, p: f64) -> Color {
     Palette::of(a).level(p)
@@ -140,6 +150,8 @@ pub fn level(a: &App, p: f64) -> Color {
 pub enum Kind {
     /// 0–100 % of a capacity (CPU, memory, disk active time, GPU), level gradient.
     Percent,
+    /// Battery charge, 0–100 %, level gradient reversed: red when empty, green when full.
+    Charge,
     /// Temperatures, given in °C and shown in the chosen unit, level gradient.
     Temp,
     /// Bytes per second (disks).
@@ -152,13 +164,13 @@ pub enum Kind {
 
 impl Kind {
     fn level(self) -> bool {
-        matches!(self, Kind::Percent | Kind::Temp)
+        matches!(self, Kind::Percent | Kind::Charge | Kind::Temp)
     }
 
     /// A raw reading as text (temperatures are in °C).
     fn fmt(self, a: &App, v: f64) -> String {
         match self {
-            Kind::Percent => format!("{v:.0}%"),
+            Kind::Percent | Kind::Charge => format!("{v:.0}%"),
             Kind::Temp => a.s.temp(v),
             Kind::Rate => rate(v),
             Kind::NetRate => net_rate(v),
@@ -236,7 +248,7 @@ impl Chart {
         let (mn, mx) = all.fold((f64::MAX, f64::MIN), |m, v| (m.0.min(v), m.1.max(v)));
         let empty = mn > mx;
         let (lo, hi) = match kind {
-            Kind::Percent => (0.0, 100.0),
+            Kind::Percent | Kind::Charge => (0.0, 100.0),
             Kind::Temp => {
                 let (lo, hi) = if empty { (disp(20.0), disp(60.0)) } else { (disp(mn), disp(mx)) };
                 // at least 10 degrees of range, so sensor noise does not look like a spike
@@ -249,7 +261,7 @@ impl Chart {
             Kind::Power => (0.0, ((if empty { 0.0 } else { mx } * 1.15).max(5.0) / 5.0).ceil() * 5.0),
         };
         let ylab = |v: f64| match kind {
-            Kind::Percent => format!("{v:.0}%"),
+            Kind::Percent | Kind::Charge => format!("{v:.0}%"),
             Kind::Temp => format!("{v:.0}{}", a.s.temp_unit()),
             Kind::Rate => compact(bytes(v)),
             Kind::NetRate => compact(net_rate(v).trim_end_matches("/s").to_string()),
@@ -258,8 +270,9 @@ impl Chart {
         // level colors are sampled along the value scale, so the fill reads like a thermometer
         let level_at = |d: f64| {
             let c = if kind == Kind::Temp && a.s.fahrenheit { (d - 32.0) * 5.0 / 9.0 } else { d };
-            pal.heat(c)
+            if kind == Kind::Charge { pal.charge(c) } else { pal.heat(c) }
         };
+        let level_of = |v: f64| if kind == Kind::Charge { rgb(pal.charge(v)) } else { pal.level(v) };
 
         let start = |n: usize| self.capacity.saturating_sub(n + self.future) as f64;
         let mut out = Vec::with_capacity(self.series.len());
@@ -270,7 +283,7 @@ impl Chart {
             let (line, grad) = if kind.level() || s.hue.is_none() {
                 let last = s.values.last().copied().unwrap_or(0.0);
                 let stops = (0..12).map(|k| pal.shade(level_at(lo + (hi - lo) * k as f64 / 11.0), 0.25)).collect();
-                (pal.level(last), Gradient::Custom(stops))
+                (level_of(last), Gradient::Custom(stops))
             } else {
                 let h = s.hue.unwrap_or(pal.accent);
                 (rgb(h), Gradient::Custom(vec![pal.shade(h, 0.8), pal.shade(h, 0.35)]))
@@ -323,7 +336,7 @@ fn stats_line(a: &App, kind: Kind, series: &[Trend], pal: &Palette, detail: u8) 
             spans.push(Span::styled(" │ ", Style::new().fg(pal.axis)));
         }
         if series.len() > 1 && !s.name.is_empty() {
-            let c = if kind.level() { pal.level(v.last().copied().unwrap_or(0.0)) } else { rgb(s.hue.unwrap_or(pal.accent)) };
+            let c = if kind.level() { let l = v.last().copied().unwrap_or(0.0); if kind == Kind::Charge { rgb(pal.charge(l)) } else { pal.level(l) } } else { rgb(s.hue.unwrap_or(pal.accent)) };
             spans.push(Span::styled(format!("{} ", s.name), Style::new().fg(c)));
         }
         if v.is_empty() {

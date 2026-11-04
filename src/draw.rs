@@ -8,7 +8,7 @@ use crate::util::*;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Row, Table, Wrap};
+use ratatui::widgets::{Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Table, Wrap};
 use ratatui::Frame;
 use std::collections::VecDeque;
 use std::io::Write;
@@ -184,8 +184,14 @@ pub fn table(f: &mut Frame, area: Rect, title: String, headers: &[&str], widths:
         .skip(*off)
         .take(h)
         .map(|(i, r)| {
-            let st = if i == sel { Style::new().fg(Color::Black).bg(accent(a)) } else { Style::new() };
-            Row::new(r).style(st)
+            let selected = i == sel;
+            let st = if selected { Style::new().fg(Color::Black).bg(accent(a)) } else { Style::new() };
+            let cells: Vec<Cell> = r
+                .into_iter()
+                .enumerate()
+                .map(|(c, v)| if selected { Cell::from(v) } else { let cs = cell_style(a, c, &v); Cell::from(Span::styled(v, cs)) })
+                .collect();
+            Row::new(cells).style(st)
         })
         .collect();
     let t = Table::new(body, widths.to_vec())
@@ -193,6 +199,23 @@ pub fn table(f: &mut Frame, area: Rect, title: String, headers: &[&str], widths:
         .block(block(format!("{title} ({total})"), a))
         .column_spacing(1);
     f.render_widget(t, area);
+}
+
+/// Colour of one list cell: first column in the accent colour, states green/yellow/red, percentages by load level.
+fn cell_style(a: &App, col: usize, v: &str) -> Style {
+    let t = v.trim();
+    let lower = t.to_lowercase();
+    let word = lower.split(|c: char| !c.is_alphanumeric()).next().unwrap_or("");
+    if let Some(p) = t.strip_suffix('%').and_then(|x| x.trim().parse::<f32>().ok()) {
+        return Style::new().fg(level_color(a, p));
+    }
+    match word {
+        "active" | "running" | "enabled" | "ok" | "good" | "passed" | "healthy" | "established" | "listen" | "yes" | "on" => Style::new().fg(Color::Green),
+        "failed" | "dead" | "critical" | "bad" | "error" | "failing" => Style::new().fg(Color::Red),
+        "inactive" | "disabled" | "warning" | "degraded" | "exposed" | "public" | "unsaved" | "no" | "off" | "masked" => Style::new().fg(Color::Yellow),
+        _ if col == 0 && !t.is_empty() => Style::new().fg(accent(a)),
+        _ => Style::new(),
+    }
 }
 
 fn page_title(a: &App, page: usize, extra: &str) -> String {
@@ -550,7 +573,7 @@ fn perf_gpu(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
         f.render_widget(Paragraph::new("No GPU telemetry available (nvidia-smi / amdgpu sysfs not found).").block(block("GPU", a)), c);
         return;
     }
-    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Percentage(40), Constraint::Percentage(25), Constraint::Min(8)]).split(c);
+    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Percentage(28), Constraint::Percentage(14), Constraint::Min(8)]).split(c);
     let idx = i.unwrap_or(0).min(a.gpu_now.len() - 1);
     let g = &a.gpu_now[idx];
     let empty = VecDeque::new();
@@ -558,21 +581,56 @@ fn perf_gpu(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
     let gm = a.dh.get(&format!("gmem:{idx}")).unwrap_or(&empty);
     load_chart(f, v[1], format!("GPU memory in use {}%", gm.back().copied().unwrap_or(0)), gm, a);
     let fm = |x: Option<f32>, u: &str| x.map(|v| format!("{v:.0} {u}")).unwrap_or_else(|| "n/a".into());
+    let mb = |x: Option<u64>| x.map(|v| bytes(v as f64)).unwrap_or_else(|| "n/a".into());
     let mut l = vec![
         line("Driver / PCI", format!("{} / {}", g.driver, g.pci)),
-        line("Memory", format!("{} / {}", g.mem_used.map(|x| bytes(x as f64)).unwrap_or("n/a".into()), g.mem_total.map(|x| bytes(x as f64)).unwrap_or("n/a".into()))),
-        line("Graphics clock / max", format!("{} / {}", fm(g.clock_mhz, "MHz"), fm(g.clock_max_mhz, "MHz"))),
-        line("Memory clock / max", format!("{} / {}", fm(g.mem_clock_mhz, "MHz"), fm(g.mem_clock_max_mhz, "MHz"))),
-        line("Power draw / limit", format!("{} / {}", fm(g.power, "W"), fm(g.power_limit, "W"))),
-        line("Temperature", g.temp.map(|t| a.s.temp(t as f64)).unwrap_or_else(|| "n/a".into())),
-        line("Video encode / decode", format!("{} / {}", fm(g.enc, "%"), fm(g.dec, "%"))),
+        line("Dedicated memory", format!("{} / {}", mb(g.mem_used), mb(g.mem_total))),
     ];
+    if g.vis_vram_total.is_some() {
+        l.push(line("  CPU-visible part", format!("{} / {}", mb(g.vis_vram_used), mb(g.vis_vram_total))));
+    }
+    if g.gtt_total.is_some() {
+        l.push(line("Shared memory (GTT)", format!("{} / {}", mb(g.gtt_used), mb(g.gtt_total))));
+    }
+    l.push(line("Memory controller", fm(g.mem_busy, "%")));
+    l.push(line("Graphics clock / max", format!("{} / {}", fm(g.clock_mhz, "MHz"), fm(g.clock_max_mhz, "MHz"))));
+    l.push(line("Memory clock / max", format!("{} / {}", fm(g.mem_clock_mhz, "MHz"), fm(g.mem_clock_max_mhz, "MHz"))));
+    l.push(line("Power draw / limit", format!("{} / {}", fm(g.power, "W"), fm(g.power_limit, "W"))));
+    l.push(line("Temperature", g.temp.map(|t| a.s.temp(t as f64)).unwrap_or_else(|| "n/a".into())));
+    l.push(line("Video encode / decode", format!("{} / {}", fm(g.enc, "%"), fm(g.dec, "%"))));
+    if g.vendor == "NVIDIA" {
+        l.push(line("Performance state", g.pstate.clone().unwrap_or_else(|| "n/a".into())));
+        l.push(line("PCIe link", g.pcie.clone().unwrap_or_else(|| "n/a".into())));
+        l.push(line("Throttle reasons", g.throttle.clone().unwrap_or_else(|| "n/a".into())));
+    }
     if a.gpu_now.len() > 1 && i.is_none() {
         for (k, o) in a.gpu_now.iter().enumerate() {
             l.push(line(&format!("GPU {k}"), format!("{} — {:.0}%", o.name, o.util.unwrap_or(0.0))));
         }
     }
-    f.render_widget(Paragraph::new(l).block(block("GPU details", a)), v[2]);
+    let hd = (l.len() as u16 + 2).min(v[2].height.saturating_sub(5));
+    let parts = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(hd), Constraint::Min(3)]).split(v[2]);
+    f.render_widget(Paragraph::new(l).block(block("GPU details", a)), parts[0]);
+
+    // processes using this GPU (matched on the PCI address)
+    let pci = crate::collect::gpuproc::norm_pci(&g.pci);
+    let single = a.gpu_now.len() == 1;
+    let rows: Vec<Vec<String>> = a
+        .gpu_procs_now
+        .procs
+        .iter()
+        .filter(|p| single || p.pci == pci)
+        .map(|p| {
+            let eng = if p.engines.is_empty() { "n/a".to_string() } else { p.engines.iter().filter(|e| e.1 >= 0.5).map(|e| format!("{} {:.0}%", e.0, e.1)).collect::<Vec<_>>().join("  ") };
+            vec![p.pid.to_string(), p.name.clone(), mb(p.vram), mb(p.shared), p.busy().map(|b| format!("{b:.0}%")).unwrap_or_else(|| "n/a".into()), eng]
+        })
+        .collect();
+    let mut title = "GPU processes".to_string();
+    if a.gpu_procs_now.restricted > 0 {
+        title.push_str(&format!(" — {} processes not inspectable (other users or kernel)", a.gpu_procs_now.restricted));
+    }
+    let mut off = 0;
+    table(f, parts[1], title, &["PID", "Name", "Dedicated", "Shared", "GPU", "Engines"], &[Constraint::Length(8), Constraint::Min(14), Constraint::Length(11), Constraint::Length(11), Constraint::Length(6), Constraint::Min(20)], rows, usize::MAX, &mut off, a);
 }
 
 // ───────────── simple table pages ─────────────
@@ -808,7 +866,7 @@ fn battery(f: &mut Frame, area: Rect, a: &mut App) {
     let mut charge = vec![Span::styled(format!("{:<26}", "Charge"), Style::new().fg(Color::DarkGray))];
     match b.percent {
         Some(p) => {
-            charge.extend(charts::meter(a, p, 24, None));
+            charge.extend(charts::meter(a, p, 24, Some(charts::charge_hue(a, p))));
             charge.push(Span::raw(format!(" {p:.0}%")));
         }
         None if !b.level.is_empty() => charge.push(Span::raw(b.level.clone())),
@@ -849,7 +907,7 @@ fn battery(f: &mut Frame, area: Rect, a: &mut App) {
     let (pct, pw) = hist.map_or((&empty, &empty), |h| (&h.pct, &h.watts));
     let take = |q: &VecDeque<u64>| q.iter().skip(q.len().saturating_sub(BAT_WINDOW)).map(|&x| x as f64).collect::<Vec<f64>>();
     let now = b.percent.map_or("no reading".to_string(), |p| format!("{p:.0}%"));
-    let mut chart = Chart::new(Kind::Percent, block(format!("Charge — {now}  (history, then forecast at current power)"), a))
+    let mut chart = Chart::new(Kind::Charge, block(format!("Charge — {now}  (history, then forecast at current power)"), a))
         .capacity(2 * BAT_WINDOW + 1)
         .span_secs(2.0 * BAT_WINDOW as f64 * BAT_EVERY as f64)
         .series("charge", take(pct).into_iter().map(|x| x / 10.0).collect(), None);

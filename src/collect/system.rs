@@ -473,16 +473,40 @@ pub struct GpuStat {
     pub enc: Option<f32>,
     pub dec: Option<f32>,
     pub pci: String,
+    /// Shared system memory used by the GPU (AMD GTT).
+    pub gtt_used: Option<u64>,
+    pub gtt_total: Option<u64>,
+    /// CPU-visible part of the VRAM (AMD).
+    pub vis_vram_used: Option<u64>,
+    pub vis_vram_total: Option<u64>,
+    /// Memory controller activity in percent.
+    pub mem_busy: Option<f32>,
+    /// NVIDIA performance state, e.g. `P8`.
+    pub pstate: Option<String>,
+    /// PCIe link, e.g. `Gen 4 x16`.
+    pub pcie: Option<String>,
+    /// Active clock throttle reasons, NVIDIA.
+    pub throttle: Option<String>,
+}
+
+fn throttle_reasons(hex: &str) -> String {
+    let Some(v) = u64::from_str_radix(hex.trim().trim_start_matches("0x"), 16).ok() else { return "n/a".into() };
+    const R: [(u64, &str); 9] = [
+        (0x1, "idle"), (0x2, "app clocks"), (0x4, "power cap"), (0x8, "HW slowdown"), (0x10, "sync boost"),
+        (0x20, "thermal"), (0x40, "HW thermal"), (0x80, "power brake"), (0x100, "display clocks"),
+    ];
+    let l: Vec<&str> = R.iter().filter(|(b, _)| v & b != 0).map(|r| r.1).collect();
+    if l.is_empty() { "none".into() } else { l.join(", ") }
 }
 
 pub fn gpus() -> Vec<GpuStat> {
     let mut out = Vec::new();
     if which("nvidia-smi") {
-        let q = "name,driver_version,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,clocks.gr,clocks.max.gr,clocks.mem,clocks.max.mem,utilization.encoder,utilization.decoder,pci.bus_id";
+        let q = "name,driver_version,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,clocks.gr,clocks.max.gr,clocks.mem,clocks.max.mem,utilization.encoder,utilization.decoder,pci.bus_id,pstate,pcie.link.gen.current,pcie.link.width.current,clocks_throttle_reasons.active,utilization.memory";
         if let Some(t) = run("nvidia-smi", &[&format!("--query-gpu={q}"), "--format=csv,noheader,nounits"]) {
             for l in t.lines() {
                 let f: Vec<&str> = l.split(',').map(str::trim).collect();
-                if f.len() < 15 {
+                if f.len() < 20 {
                     continue;
                 }
                 let n = |i: usize| f[i].parse::<f32>().ok();
@@ -503,6 +527,11 @@ pub fn gpus() -> Vec<GpuStat> {
                     enc: n(12),
                     dec: n(13),
                     pci: f[14].into(),
+                    pstate: Some(f[15].to_string()).filter(|x| x.starts_with('P')),
+                    pcie: (f[16].parse::<u32>().is_ok() && f[17].parse::<u32>().is_ok()).then(|| format!("Gen {} x{}", f[16], f[17])),
+                    throttle: Some(throttle_reasons(f[18])),
+                    mem_busy: n(19),
+                    ..Default::default()
                 });
             }
         }
@@ -532,6 +561,11 @@ pub fn gpus() -> Vec<GpuStat> {
             g.util = read_f64(&format!("{ds}/gpu_busy_percent")).map(|v| v as f32);
             g.mem_used = read_u64(&format!("{ds}/mem_info_vram_used"));
             g.mem_total = read_u64(&format!("{ds}/mem_info_vram_total"));
+            g.gtt_used = read_u64(&format!("{ds}/mem_info_gtt_used"));
+            g.gtt_total = read_u64(&format!("{ds}/mem_info_gtt_total"));
+            g.vis_vram_used = read_u64(&format!("{ds}/mem_info_vis_vram_used"));
+            g.vis_vram_total = read_u64(&format!("{ds}/mem_info_vis_vram_total"));
+            g.mem_busy = read_f64(&format!("{ds}/mem_busy_percent")).map(|v| v as f32);
             if let Ok(hw) = std::fs::read_dir(d.join("hwmon")) {
                 for h in hw.flatten() {
                     let hp = h.path().to_string_lossy().into_owned();
