@@ -298,6 +298,7 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
     let view = a.proc_view();
     let cur = view.iter().position(|(_, i)| a.plist[*i].pid == a.proc_sel).unwrap_or(0);
     let mut rows = Vec::with_capacity(view.len());
+    let gpu = a.gpu_by_pid();
     let parents: std::collections::HashSet<i32> = a.plist.iter().map(|p| p.ppid).collect();
     for (d, i) in &view {
         let p = &a.plist[*i];
@@ -318,6 +319,8 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
             p.user.clone(),
             p.state_label().to_string(),
             p.threads.to_string(),
+            gpu.get(&(p.pid as u32)).and_then(|g| g.0).map(|v| format!("{v:.0}%")).unwrap_or_else(|| "-".into()),
+            gpu.get(&(p.pid as u32)).and_then(|g| g.1).map(|v| bytes(v as f64)).unwrap_or_else(|| "-".into()),
         ]);
     }
     let arrow = if a.s.sort_desc { "▼" } else { "▲" };
@@ -331,7 +334,7 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
         v[0],
         title,
         &hs,
-        &[Constraint::Min(18), Constraint::Length(8), Constraint::Length(8), Constraint::Length(10), Constraint::Length(11), Constraint::Length(11), Constraint::Length(12), Constraint::Length(9), Constraint::Length(7)],
+        &[Constraint::Min(18), Constraint::Length(8), Constraint::Length(8), Constraint::Length(10), Constraint::Length(11), Constraint::Length(11), Constraint::Length(12), Constraint::Length(9), Constraint::Length(7), Constraint::Length(6), Constraint::Length(10)],
         rows,
         cur,
         &mut off,
@@ -568,18 +571,107 @@ fn perf_net(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
     f.render_widget(Paragraph::new(l).block(block("Network details", a)), v[2]);
 }
 
+/// Colour of a GPU runtime in the VRAM bar and its legend.
+fn runtime_color(r: &str) -> Color {
+    match r {
+        "CUDA" => Color::Green,
+        "HIP" => Color::Red,
+        "ggml" => Color::Magenta,
+        "ONNX" => Color::Blue,
+        "OpenCL" => Color::Yellow,
+        "Level Zero" => Color::LightBlue,
+        "Vulkan" => Color::Cyan,
+        "OpenGL" => Color::LightYellow,
+        "Video" => Color::LightMagenta,
+        _ => Color::Gray,
+    }
+}
+
+/// VRAM bar split in coloured portions, one per runtime (same proportions as the "By runtime" table).
+/// What the processes do not account for is drawn in dark gray, free memory as a dim track.
+fn vram_bar(f: &mut Frame, area: Rect, a: &App, label: String, used: u64, total: u64, groups: &[(&str, usize, u64, u64, f32)]) {
+    let blk = block(format!("VRAM {label}"), a);
+    let inner = blk.inner(area);
+    f.render_widget(blk, area);
+    let w = inner.width as usize;
+    if w == 0 || inner.height == 0 {
+        return;
+    }
+    let track = if a.s.light_theme { Color::Rgb(210, 210, 210) } else { Color::Rgb(70, 70, 70) };
+    let mut parts: Vec<(String, u64, Color)> = groups.iter().filter(|g| g.2 > 0).map(|g| (g.0.to_string(), g.2, runtime_color(g.0))).collect();
+    let attributed: u64 = parts.iter().map(|p| p.1).sum();
+    if used > attributed {
+        parts.push(("other".into(), used - attributed, Color::DarkGray));
+    }
+    // cumulative rounding so the segments always add up to the used part of the bar
+    let mut spans = Vec::new();
+    let (mut acc, mut drawn) = (0u64, 0usize);
+    for (_, bytes_, c) in &parts {
+        acc += bytes_;
+        let end = ((acc.min(total) as f64 / total as f64) * w as f64).round() as usize;
+        if end > drawn {
+            spans.push(Span::styled("█".repeat(end - drawn), Style::new().fg(*c)));
+            drawn = end;
+        }
+    }
+    spans.push(Span::styled("░".repeat(w.saturating_sub(drawn)), Style::new().fg(track)));
+    f.render_widget(Paragraph::new(Line::from(spans)), Rect { height: 1, ..inner });
+    if inner.height > 1 {
+        let mut leg = Vec::new();
+        for (n, b, c) in &parts {
+            leg.push(Span::styled("■ ", Style::new().fg(*c)));
+            leg.push(Span::raw(format!("{n} {} ({:.0}%)  ", bytes(*b as f64), *b as f64 / total as f64 * 100.0)));
+        }
+        f.render_widget(Paragraph::new(Line::from(leg)), Rect { y: inner.y + 1, height: 1, ..inner });
+    }
+}
+
 fn perf_gpu(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
     if a.gpu_now.is_empty() {
         f.render_widget(Paragraph::new("No GPU telemetry available (nvidia-smi / amdgpu sysfs not found).").block(block("GPU", a)), c);
         return;
     }
-    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Percentage(28), Constraint::Percentage(14), Constraint::Min(8)]).split(c);
+    let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Percentage(26), Constraint::Percentage(13), Constraint::Length(4), Constraint::Min(8)]).split(c);
     let idx = i.unwrap_or(0).min(a.gpu_now.len() - 1);
     let g = &a.gpu_now[idx];
+    // processes using this GPU (matched on the PCI address)
+    let pci = crate::collect::gpuproc::norm_pci(&g.pci);
+    let single = a.gpu_now.len() == 1;
+    let mut mine: Vec<&crate::collect::gpuproc::GpuProc> = a.gpu_procs_now.procs.iter().filter(|p| single || p.pci == pci).collect();
+    // classified by detected runtime, then by dedicated memory
+    mine.sort_by(|x, y| crate::collect::gpuproc::runtime_rank(x.runtime).cmp(&crate::collect::gpuproc::runtime_rank(y.runtime)).then(y.vram.unwrap_or(0).cmp(&x.vram.unwrap_or(0))));
+    // occupancy per runtime
+    let mut groups: Vec<(&str, usize, u64, u64, f32)> = Vec::new();
+    for p in &mine {
+        let r = if p.runtime.is_empty() { "unknown" } else { p.runtime };
+        let i = match groups.iter().position(|g| g.0 == r) { Some(i) => i, None => { groups.push((r, 0, 0, 0, 0.0)); groups.len() - 1 } };
+        groups[i].1 += 1;
+        groups[i].2 += p.vram.unwrap_or(0);
+        groups[i].3 += p.shared.unwrap_or(0);
+        groups[i].4 += p.busy().unwrap_or(0.0);
+    }
+    let total_vram = g.mem_total.unwrap_or(0).max(1);
     let empty = VecDeque::new();
     load_chart(f, v[0], format!("{} — utilization {:.0}%", g.name, g.util.unwrap_or(0.0)), a.dh.get(&format!("gpu:{idx}")).unwrap_or(&empty), a);
     let gm = a.dh.get(&format!("gmem:{idx}")).unwrap_or(&empty);
     load_chart(f, v[1], format!("GPU memory in use {}%", gm.back().copied().unwrap_or(0)), gm, a);
+    // memory bars: dedicated VRAM, and shared memory (GTT) when the driver reports it
+    let ratio = |u: Option<u64>, t: Option<u64>| match (u, t) { (Some(u), Some(t)) if t > 0 => Some(u as f64 / t as f64), _ => None };
+    let bars: Vec<(&str, Option<u64>, Option<u64>)> = [("VRAM", g.mem_used, g.mem_total), ("Shared (GTT)", g.gtt_used, g.gtt_total)].into_iter().filter(|b| b.2.is_some()).collect();
+    if !bars.is_empty() {
+        let cols = Layout::default().direction(Direction::Horizontal).constraints(vec![Constraint::Ratio(1, bars.len() as u32); bars.len()]).split(v[2]);
+        for (k, (name, u, t)) in bars.iter().enumerate() {
+            let r = ratio(*u, *t).unwrap_or(0.0);
+            let label = format!("{} / {}  {:.0}%", u.map(|x| bytes(x as f64)).unwrap_or_else(|| "n/a".into()), t.map(|x| bytes(x as f64)).unwrap_or_else(|| "n/a".into()), r * 100.0);
+            if *name == "VRAM" && t.unwrap_or(0) > 0 {
+                vram_bar(f, cols[k], a, label, u.unwrap_or(0), t.unwrap_or(1), &groups);
+            } else {
+                charts::gauge(f, cols[k], a, r, label, block(*name, a), None);
+            }
+        }
+    } else {
+        f.render_widget(Paragraph::new("VRAM usage not reported by this driver").block(block("VRAM", a)), v[2]);
+    }
     let fm = |x: Option<f32>, u: &str| x.map(|v| format!("{v:.0} {u}")).unwrap_or_else(|| "n/a".into());
     let mb = |x: Option<u64>| x.map(|v| bytes(v as f64)).unwrap_or_else(|| "n/a".into());
     let mut l = vec![
@@ -608,29 +700,50 @@ fn perf_gpu(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
             l.push(line(&format!("GPU {k}"), format!("{} — {:.0}%", o.name, o.util.unwrap_or(0.0))));
         }
     }
-    let hd = (l.len() as u16 + 2).min(v[2].height.saturating_sub(5));
-    let parts = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(hd), Constraint::Min(3)]).split(v[2]);
+    // details and processes side by side when the terminal is wide enough, stacked otherwise
+    let parts = if v[3].width >= 100 {
+        Layout::default().direction(Direction::Horizontal).constraints([Constraint::Length(56), Constraint::Min(40)]).split(v[3])
+    } else {
+        let hd = (l.len() as u16 + 2).min(v[3].height.saturating_sub(5));
+        Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(hd), Constraint::Min(3)]).split(v[3])
+    };
     f.render_widget(Paragraph::new(l).block(block("GPU details", a)), parts[0]);
 
-    // processes using this GPU (matched on the PCI address)
-    let pci = crate::collect::gpuproc::norm_pci(&g.pci);
-    let single = a.gpu_now.len() == 1;
-    let rows: Vec<Vec<String>> = a
-        .gpu_procs_now
-        .procs
+    let rows: Vec<Vec<String>> = mine
         .iter()
-        .filter(|p| single || p.pci == pci)
         .map(|p| {
             let eng = if p.engines.is_empty() { "n/a".to_string() } else { p.engines.iter().filter(|e| e.1 >= 0.5).map(|e| format!("{} {:.0}%", e.0, e.1)).collect::<Vec<_>>().join("  ") };
-            vec![p.pid.to_string(), p.name.clone(), mb(p.vram), mb(p.shared), p.busy().map(|b| format!("{b:.0}%")).unwrap_or_else(|| "n/a".into()), eng]
+            vec![p.runtime_label(), p.pid.to_string(), p.name.clone(), mb(p.vram), mb(p.shared), p.busy().map(|b| format!("{b:.0}%")).unwrap_or_else(|| "n/a".into()), eng]
         })
         .collect();
+    let grows: Vec<Vec<String>> = groups.iter().map(|g| vec![g.0.to_string(), g.1.to_string(), bytes(g.2 as f64), format!("{:.0}%", g.2 as f64 / total_vram as f64 * 100.0), bytes(g.3 as f64), format!("{:.0}%", g.4.min(100.0))]).collect();
     let mut title = "GPU processes".to_string();
     if a.gpu_procs_now.restricted > 0 {
         title.push_str(&format!(" — {} processes not inspectable (other users or kernel)", a.gpu_procs_now.restricted));
     }
     let mut off = 0;
-    table(f, parts[1], title, &["PID", "Name", "Dedicated", "Shared", "GPU", "Engines"], &[Constraint::Length(8), Constraint::Min(14), Constraint::Length(11), Constraint::Length(11), Constraint::Length(6), Constraint::Min(20)], rows, usize::MAX, &mut off, a);
+    // processes on top, then "By runtime" and "By engine" side by side below
+    let bh = (parts[1].height / 2).clamp(6, 16).min(parts[1].height.saturating_sub(6));
+    let rs = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(5), Constraint::Length(bh)]).split(parts[1]);
+    let bottom = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Percentage(52), Constraint::Percentage(48)]).split(rs[1]);
+    table(f, rs[0], title, &["Runtime", "PID", "Name", "Dedicated", "Shared", "GPU", "Engines"], &[Constraint::Length(10), Constraint::Length(8), Constraint::Min(12), Constraint::Length(10), Constraint::Length(10), Constraint::Length(5), Constraint::Min(14)], rows, usize::MAX, &mut off, a);
+    if bh >= 4 {
+        let mut off2 = 0;
+        table(f, bottom[0], "By runtime".into(), &["Runtime", "Proc", "VRAM", "%VRAM", "Shared", "GPU"], &[Constraint::Length(10), Constraint::Length(4), Constraint::Length(9), Constraint::Length(6), Constraint::Min(8), Constraint::Length(5)], grows, usize::MAX, &mut off2, a);
+        // occupancy per engine class: class total, then the busiest processes of that class
+        let mut erows: Vec<Vec<String>> = Vec::new();
+        for (ci, cname) in crate::collect::gpuproc::ENGINE_CLASSES.iter().enumerate() {
+            let mut act: Vec<(&crate::collect::gpuproc::GpuProc, f32)> = mine.iter().map(|p| (*p, p.class_loads()[ci])).filter(|x| x.1 >= 0.5).collect();
+            act.sort_by(|x, y| y.1.total_cmp(&x.1));
+            let total: f32 = if act.is_empty() { 0.0 } else { act.iter().map(|x| x.1).sum::<f32>().min(100.0) };
+            erows.push(vec![cname.to_string(), if act.is_empty() { "idle".into() } else { format!("{} proc.", act.len()) }, format!("{total:.0}%")]);
+            for (p, l) in act.iter().take(4) {
+                erows.push(vec![String::new(), format!("  {} ({})", p.name, p.pid), format!("{l:.0}%")]);
+            }
+        }
+        let mut off3 = 0;
+        table(f, bottom[1], "By engine".into(), &["Engine", "Process", "Load"], &[Constraint::Length(8), Constraint::Min(16), Constraint::Length(5)], erows, usize::MAX, &mut off3, a);
+    }
 }
 
 // ───────────── simple table pages ─────────────

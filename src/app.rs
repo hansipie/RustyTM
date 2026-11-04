@@ -41,7 +41,7 @@ pub const HIST_LEN: usize = 120;
 /// The battery history is sampled this often (seconds) and keeps `BAT_LEN` samples (3 hours).
 pub const BAT_EVERY: u64 = 10;
 pub const BAT_LEN: usize = 1080;
-pub const PROC_COLS: [&str; 9] = ["Name", "PID", "CPU", "Memory", "Disk read", "Disk write", "User", "Status", "Threads"];
+pub const PROC_COLS: [&str; 11] = ["Name", "PID", "CPU", "Memory", "Disk read", "Disk write", "User", "Status", "Threads", "GPU", "VRAM"];
 
 pub fn page_from_name(n: &str) -> Option<usize> {
     let n = n.to_lowercase().replace(['-', '_', ' ', '&'], "");
@@ -709,6 +709,17 @@ impl App {
         cells.iter().any(|c| c.to_lowercase().contains(&f))
     }
 
+    /// Per-PID GPU usage: (highest engine load summed over GPUs, dedicated memory summed over GPUs).
+    pub fn gpu_by_pid(&self) -> std::collections::HashMap<u32, (Option<f32>, Option<u64>)> {
+        let mut m: std::collections::HashMap<u32, (Option<f32>, Option<u64>)> = std::collections::HashMap::new();
+        for g in &self.gpu_procs_now.procs {
+            let e = m.entry(g.pid).or_insert((None, None));
+            if let Some(b) = g.busy() { e.0 = Some(e.0.unwrap_or(0.0) + b); }
+            if let Some(v) = g.vram { e.1 = Some(e.1.unwrap_or(0) + v); }
+        }
+        m
+    }
+
     /// Processes page ordering: (tree depth, index into `plist`).
     pub fn proc_view(&self) -> Vec<(usize, usize)> {
         let f = &self.filter[P_PROCESSES];
@@ -718,6 +729,7 @@ impl App {
         }
         let mut v: Vec<usize> = (0..self.plist.len()).filter(|&i| idx_ok(&self.plist[i])).collect();
         let col = self.s.sort_col.min(PROC_COLS.len() - 1);
+        let gpu = if col >= 9 { self.gpu_by_pid() } else { Default::default() };
         v.sort_by(|&a, &b| {
             let (x, y) = (&self.plist[a], &self.plist[b]);
             let o = match col {
@@ -729,6 +741,8 @@ impl App {
                 5 => x.write_rate.partial_cmp(&y.write_rate).unwrap_or(std::cmp::Ordering::Equal),
                 6 => x.user.cmp(&y.user),
                 7 => x.state_label().cmp(y.state_label()),
+                9 => gpu.get(&(x.pid as u32)).and_then(|g| g.0).unwrap_or(-1.0).partial_cmp(&gpu.get(&(y.pid as u32)).and_then(|g| g.0).unwrap_or(-1.0)).unwrap_or(std::cmp::Ordering::Equal),
+                10 => gpu.get(&(x.pid as u32)).and_then(|g| g.1).cmp(&gpu.get(&(y.pid as u32)).and_then(|g| g.1)),
                 _ => x.threads.cmp(&y.threads),
             };
             if self.s.sort_desc { o.reverse() } else { o }

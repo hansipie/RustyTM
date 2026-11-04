@@ -18,9 +18,72 @@ pub struct GpuProc {
     pub shared: Option<u64>,
     /// Engine name -> load in percent (already divided by the engine capacity).
     pub engines: Vec<(String, f32)>,
+    /// Main GPU runtime detected from the loaded libraries (`CUDA`, `HIP`, `Vulkan`...), `unknown` if not readable.
+    pub runtime: &'static str,
+}
+
+/// Runtimes in display order: compute stacks first, then graphics, then video.
+pub const RUNTIMES: [&str; 10] = ["CUDA", "HIP", "ggml", "ONNX", "OpenCL", "Level Zero", "Vulkan", "OpenGL", "Video", "unknown"];
+
+/// Library name fragments identifying a runtime in `/proc/<pid>/maps`.
+const RUNTIME_LIBS: [(&str, &[&str]); 9] = [
+    ("CUDA", &["/libcuda.so", "/libcudart", "/libnvidia-ptxjitcompiler"]),
+    ("HIP", &["/libamdhip64", "/libhsa-runtime64", "/librocblas"]),
+    ("ggml", &["/libggml"]),
+    ("ONNX", &["/libonnxruntime"]),
+    ("OpenCL", &["/libOpenCL"]),
+    ("Level Zero", &["/libze_loader", "/libze_intel_gpu"]),
+    ("Vulkan", &["/libvulkan"]),
+    ("OpenGL", &["/libGL.so", "/libGLX", "/libEGL", "/libgbm", "/libGLdispatch"]),
+    ("Video", &["/libva.so", "/libvdpau", "/libnvcuvid", "/libnvidia-encode"]),
+];
+
+/// Main runtime of a process from the text of its `/proc/<pid>/maps`.
+pub fn detect_runtime(maps: &str) -> &'static str {
+    RUNTIME_LIBS.iter().find(|(_, libs)| libs.iter().any(|l| maps.contains(l))).map(|r| r.0).unwrap_or("unknown")
+}
+
+/// Engine classes shown in the UI.
+pub const ENGINE_CLASSES: [&str; 4] = ["3D", "Compute", "Copy", "Video"];
+
+/// Class of a driver engine name: amdgpu (`gfx`, `compute`, `dma`, `dec`, `enc`...),
+/// i915 (`render`, `copy`, `video`, `video-enhance`), xe (`rcs`, `ccs`, `bcs`, `vcs`, `vecs`), nvidia-smi (`gfx`, `compute`, `enc`, `dec`).
+pub fn engine_class(name: &str) -> Option<usize> {
+    let n = name.to_lowercase();
+    let any = |l: &[&str]| l.iter().any(|x| n.starts_with(x));
+    if any(&["gfx", "render", "rcs", "3d", "graphics"]) {
+        Some(0)
+    } else if any(&["compute", "ccs", "comp"]) {
+        Some(1)
+    } else if any(&["dma", "copy", "bcs", "sdma", "blit"]) {
+        Some(2)
+    } else if any(&["dec", "enc", "vcs", "vecs", "video", "jpeg", "vcn", "uvd", "vce", "ofa"]) {
+        Some(3)
+    } else {
+        None
+    }
+}
+
+pub fn runtime_rank(r: &str) -> usize {
+    RUNTIMES.iter().position(|x| *x == r).unwrap_or(RUNTIMES.len())
 }
 
 impl GpuProc {
+    /// Load per engine class (3D, Compute, Copy, Video), in percent.
+    pub fn class_loads(&self) -> [f32; 4] {
+        let mut l = [0.0f32; 4];
+        for (n, v) in &self.engines {
+            if let Some(i) = engine_class(n) {
+                l[i] = (l[i] + v).min(100.0);
+            }
+        }
+        l
+    }
+
+    pub fn runtime_label(&self) -> String {
+        if self.runtime.is_empty() { "unknown".into() } else { self.runtime.into() }
+    }
+
     /// Highest engine load, if any engine reports one.
     pub fn busy(&self) -> Option<f32> {
         self.engines.iter().map(|e| e.1).fold(None, |m, v| Some(m.map_or(v, |x: f32| x.max(v))))
@@ -130,6 +193,7 @@ type Prev = HashMap<(u32, u64), (Instant, HashMap<String, (u64, u64)>)>;
 #[derive(Default)]
 pub struct GpuProcSampler {
     prev: Prev,
+    runtimes: HashMap<u32, &'static str>,
 }
 
 impl GpuProcSampler {
@@ -202,6 +266,15 @@ impl GpuProcSampler {
         self.prev = seen;
         snap.procs = agg.into_values().collect();
         nvidia(&mut snap);
+        // runtime from the loaded libraries; /proc/<pid>/maps is read once per process
+        let mut rt = HashMap::new();
+        for p in &mut snap.procs {
+            let r = *rt.entry(p.pid).or_insert_with(|| {
+                self.runtimes.get(&p.pid).copied().unwrap_or_else(|| read(&format!("/proc/{}/maps", p.pid)).map(|m| detect_runtime(&m)).unwrap_or("unknown"))
+            });
+            p.runtime = r;
+        }
+        self.runtimes = rt;
         snap.procs.sort_by(|a, b| b.vram.unwrap_or(0).cmp(&a.vram.unwrap_or(0)).then(b.busy().unwrap_or(0.0).total_cmp(&a.busy().unwrap_or(0.0))));
         snap
     }
@@ -261,7 +334,9 @@ fn nvidia(snap: &mut GpuProcSnap) {
         let (Some(g), Some(pid)) = (col("gpu").and_then(|x| x.parse::<usize>().ok()), col("pid").and_then(|x| x.parse::<u32>().ok())) else { continue };
         let Some(pci) = pcis.get(g) else { continue };
         let Some(&i) = idx.get(&(pid, pci.clone())) else { continue };
-        for (key, label) in [("sm", "sm"), ("enc", "enc"), ("dec", "dec")] {
+        let ty = col("type").unwrap_or("G");
+        let sm = if ty.contains('C') && !ty.contains('G') { "compute" } else { "gfx" };
+        for (key, label) in [("sm", sm), ("enc", "enc"), ("dec", "dec")] {
             if let Some(v) = col(key).and_then(|x| x.parse::<f32>().ok()) {
                 snap.procs[i].engines.push((label.into(), v));
             }
@@ -292,6 +367,25 @@ mod tests {
     }
 
     #[test]
+    fn runtime_detection() {
+        assert_eq!(detect_runtime("7f00 r-xp /usr/lib64/libcuda.so.1\n7f01 r-xp /usr/lib64/libvulkan.so.1"), "CUDA");
+        assert_eq!(detect_runtime("7f01 r-xp /usr/lib64/libvulkan.so.1"), "Vulkan");
+        assert_eq!(detect_runtime("7f01 r-xp /usr/lib64/libamdhip64.so.6"), "HIP");
+        assert_eq!(detect_runtime("7f01 r-xp /usr/lib64/libc.so.6"), "unknown");
+        assert!(runtime_rank("CUDA") < runtime_rank("Vulkan"));
+    }
+
+    #[test]
+    fn engine_classes() {
+        for (n, c) in [("gfx", 0), ("render", 0), ("rcs", 0), ("compute", 1), ("ccs", 1), ("dma", 2), ("copy", 2), ("bcs", 2), ("dec", 3), ("enc", 3), ("vcs", 3), ("video-enhance", 3), ("vecs", 3)] {
+            assert_eq!(engine_class(n), Some(c), "{n}");
+        }
+        assert_eq!(engine_class("weird"), None);
+        let p = GpuProc { engines: vec![("gfx".into(), 60.0), ("render".into(), 70.0), ("dec".into(), 5.0)], ..Default::default() };
+        assert_eq!(p.class_loads(), [100.0, 0.0, 0.0, 5.0]);
+    }
+
+    #[test]
     fn non_drm_fdinfo_is_ignored() {
         assert!(parse_fdinfo("pos:\t0\nflags:\t02\n").is_none());
     }
@@ -303,7 +397,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(500));
         let b = s.sample();
         for p in &b.procs {
-            eprintln!("{} {} {} vram={:?} shared={:?} {:?}", p.pid, p.name, p.pci, p.vram, p.shared, p.engines);
+            eprintln!("{} {} {} {} vram={:?} shared={:?} {:?}", p.runtime, p.pid, p.name, p.pci, p.vram, p.shared, p.engines);
         }
         eprintln!("first={} second={} restricted={}", a.procs.len(), b.procs.len(), b.restricted);
     }
