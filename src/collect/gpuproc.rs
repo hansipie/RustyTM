@@ -196,6 +196,8 @@ pub struct GpuProcSampler {
     runtimes: HashMap<u32, &'static str>,
     /// PIDs that held a DRM descriptor at the last full scan; rescanned every cycle.
     drm_pids: HashSet<u32>,
+    /// Every PID listed in /proc at the previous pass: a PID missing from it is new and gets scanned at once.
+    known_pids: HashSet<u32>,
     cycle: u32,
     restricted: usize,
 }
@@ -221,10 +223,13 @@ impl GpuProcSampler {
         self.cycle = self.cycle.wrapping_add(1);
         let mut restricted = 0;
         let mut drm_pids: HashSet<u32> = HashSet::new();
+        let mut alive: HashSet<u32> = HashSet::with_capacity(self.known_pids.len() + 16);
         if let Ok(rd) = std::fs::read_dir("/proc") {
             for e in rd.flatten() {
                 let Some(pid) = e.file_name().to_str().and_then(|s| s.parse::<u32>().ok()) else { continue };
-                if !full && !self.drm_pids.contains(&pid) {
+                alive.insert(pid);
+                // between full scans: known DRM clients, plus processes never seen before (catches short-lived clients)
+                if !full && !self.drm_pids.contains(&pid) && self.known_pids.contains(&pid) {
                     continue;
                 }
                 let Ok(fds) = std::fs::read_dir(format!("/proc/{pid}/fd")) else {
@@ -290,6 +295,7 @@ impl GpuProcSampler {
             self.restricted = restricted;
         }
         snap.restricted = self.restricted;
+        self.known_pids = alive;
         self.drm_pids = if full { drm_pids } else { self.drm_pids.union(&drm_pids).copied().collect() };
         snap.procs = agg.into_values().collect();
         nvidia(&mut snap);
