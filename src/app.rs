@@ -10,6 +10,7 @@ use crate::util::*;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -175,10 +176,12 @@ pub struct App {
     pub mem: Mem,
     pub disks: Vec<DiskStat>,
     pub nets: Vec<NetStat>,
-    pub gpus: Arc<Mutex<Vec<GpuStat>>>,
-    pub gpu_now: Vec<GpuStat>,
-    pub gpu_procs: Arc<Mutex<crate::collect::gpuproc::GpuProcSnap>>,
-    pub gpu_procs_now: crate::collect::gpuproc::GpuProcSnap,
+    pub gpus: Arc<Mutex<Arc<Vec<GpuStat>>>>,
+    pub gpu_now: Arc<Vec<GpuStat>>,
+    pub gpu_procs: Arc<Mutex<Arc<crate::collect::gpuproc::GpuProcSnap>>>,
+    pub gpu_procs_now: Arc<crate::collect::gpuproc::GpuProcSnap>,
+    /// Set by the UI: the per-process GPU worker only scans /proc while a page shows its data.
+    gpu_procs_wanted: Arc<AtomicBool>,
     pub sensors: Vec<Sensor>,
     pub restricted: Vec<String>,
     pub procs: Vec<Proc>,
@@ -258,25 +261,31 @@ impl App {
     pub fn new(s: Settings) -> App {
         crate::util::set_net_bits(s.net_bits);
         let cpu_static = cpu_static();
-        let gpus = Arc::new(Mutex::new(crate::collect::system::gpus()));
+        let gpus = Arc::new(Mutex::new(Arc::new(crate::collect::system::gpus())));
         {
             let g = gpus.clone();
             std::thread::spawn(move || loop {
                 std::thread::sleep(Duration::from_millis(1500));
-                let v = crate::collect::system::gpus();
+                let v = Arc::new(crate::collect::system::gpus());
                 if let Ok(mut x) = g.lock() {
                     *x = v;
                 }
             });
         }
         // per-process GPU usage on its own thread: scanning /proc and calling nvidia-smi is slow
-        let gpu_procs = Arc::new(Mutex::new(crate::collect::gpuproc::GpuProcSnap::default()));
+        let gpu_procs = Arc::new(Mutex::new(Arc::new(crate::collect::gpuproc::GpuProcSnap::default())));
+        let gpu_procs_wanted = Arc::new(AtomicBool::new(false));
         {
             let g = gpu_procs.clone();
+            let wanted = gpu_procs_wanted.clone();
             std::thread::spawn(move || {
                 let mut sampler = crate::collect::gpuproc::GpuProcSampler::default();
                 loop {
-                    let v = sampler.sample();
+                    if !wanted.load(Ordering::Relaxed) {
+                        std::thread::sleep(Duration::from_millis(250));
+                        continue;
+                    }
+                    let v = Arc::new(sampler.sample());
                     if let Ok(mut x) = g.lock() {
                         *x = v;
                     }
@@ -314,9 +323,10 @@ impl App {
             disks: vec![],
             nets: vec![],
             gpus,
-            gpu_now: vec![],
+            gpu_now: Arc::new(vec![]),
             gpu_procs,
             gpu_procs_now: Default::default(),
+            gpu_procs_wanted,
             sensors: vec![],
             restricted: vec![],
             procs: vec![],
@@ -404,6 +414,8 @@ impl App {
 
     pub fn tick(&mut self) {
         self.last_tick = Instant::now();
+        // per-process GPU data is only shown on these pages
+        self.gpu_procs_wanted.store(matches!(self.page, P_PROCESSES | P_PERF), Ordering::Relaxed);
         // the run appends to the history file when it ends
         let running = self.bench.running();
         if self.bench_was_running && !running {

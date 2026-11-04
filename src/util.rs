@@ -64,10 +64,20 @@ pub fn run(cmd: &str, args: &[&str]) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+/// Whether `cmd` is in PATH. The PATH walk is memoised: installed tools do not change while the app runs.
 pub fn which(cmd: &str) -> bool {
-    std::env::var_os("PATH")
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, bool>>> = std::sync::OnceLock::new();
+    let cache = CACHE.get_or_init(Default::default);
+    if let Some(&v) = cache.lock().ok().and_then(|c| c.get(cmd).copied()).as_ref() {
+        return v;
+    }
+    let found = std::env::var_os("PATH")
         .map(|p| std::env::split_paths(&p).any(|d| d.join(cmd).is_file()))
-        .unwrap_or(false)
+        .unwrap_or(false);
+    if let Ok(mut c) = cache.lock() {
+        c.insert(cmd.to_string(), found);
+    }
+    found
 }
 
 pub fn home() -> PathBuf {

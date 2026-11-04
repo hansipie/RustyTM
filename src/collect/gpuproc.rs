@@ -194,7 +194,14 @@ type Prev = HashMap<(u32, u64), (Instant, HashMap<String, (u64, u64)>)>;
 pub struct GpuProcSampler {
     prev: Prev,
     runtimes: HashMap<u32, &'static str>,
+    /// PIDs that held a DRM descriptor at the last full scan; rescanned every cycle.
+    drm_pids: HashSet<u32>,
+    cycle: u32,
+    restricted: usize,
 }
+
+/// A full scan of every process descriptor happens every this many cycles; in between only known DRM clients are read.
+const FULL_SCAN_EVERY: u32 = 5;
 
 impl GpuProcSampler {
     pub fn sample(&mut self) -> GpuProcSnap {
@@ -203,11 +210,18 @@ impl GpuProcSampler {
         let now = Instant::now();
         let mut seen: Prev = HashMap::new();
         let mut done: HashSet<(u32, u64)> = HashSet::new();
+        let full = self.cycle % FULL_SCAN_EVERY == 0;
+        self.cycle = self.cycle.wrapping_add(1);
+        let mut restricted = 0;
+        let mut drm_pids: HashSet<u32> = HashSet::new();
         if let Ok(rd) = std::fs::read_dir("/proc") {
             for e in rd.flatten() {
                 let Some(pid) = e.file_name().to_str().and_then(|s| s.parse::<u32>().ok()) else { continue };
+                if !full && !self.drm_pids.contains(&pid) {
+                    continue;
+                }
                 let Ok(fds) = std::fs::read_dir(format!("/proc/{pid}/fd")) else {
-                    snap.restricted += 1;
+                    restricted += 1;
                     continue;
                 };
                 for fd in fds.flatten() {
@@ -217,6 +231,7 @@ impl GpuProcSampler {
                     }
                     let Some(text) = read(&format!("/proc/{pid}/fdinfo/{}", fd.file_name().to_string_lossy())) else { continue };
                     let Some((id, c)) = parse_fdinfo(&text) else { continue };
+                    drm_pids.insert(pid);
                     if !done.insert((pid, id)) {
                         continue; // same DRM client reached through several descriptors
                     }
@@ -264,6 +279,11 @@ impl GpuProcSampler {
             }
         }
         self.prev = seen;
+        if full {
+            self.restricted = restricted;
+        }
+        snap.restricted = self.restricted;
+        self.drm_pids = if full { drm_pids } else { self.drm_pids.union(&drm_pids).copied().collect() };
         snap.procs = agg.into_values().collect();
         nvidia(&mut snap);
         // runtime from the loaded libraries; /proc/<pid>/maps is read once per process
