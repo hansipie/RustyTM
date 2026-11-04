@@ -264,7 +264,7 @@ fn summary(f: &mut Frame, area: Rect, a: &App) {
     load_chart(f, mid[2], gt, &a.hist.gpu, a);
     // top processes + system pressure
     let bot = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Min(30), Constraint::Length(36)]).split(v[2]);
-    let mut top5: Vec<&Proc> = a.procs.iter().collect();
+    let mut top5: Vec<&Proc> = a.procs().iter().collect();
     top5.sort_by(|x, y| y.cpu.partial_cmp(&x.cpu).unwrap_or(std::cmp::Ordering::Equal));
     let rows: Vec<Row> = top5
         .iter()
@@ -291,8 +291,8 @@ fn summary(f: &mut Frame, area: Rect, a: &App) {
     let foot = format!(
         " Uptime {}   Load {l1:.2} {l5:.2} {l15:.2}   Tasks {tasks}   Processes {}   Threads {}   Services {}   Sessions {}",
         uptime_str(uptime_secs()),
-        a.procs.len(),
-        a.procs.iter().map(|p| p.threads as u64).sum::<u64>(),
+        a.procs().len(),
+        a.procs().iter().map(|p| p.threads as u64).sum::<u64>(),
         if a.services.is_empty() { "—".into() } else { format!("{} running", a.services.iter().filter(|s| s.sub == "running").count()) },
         a.sessions.len()
     );
@@ -302,9 +302,8 @@ fn summary(f: &mut Frame, area: Rect, a: &App) {
 // ───────────── processes ─────────────
 
 fn processes(f: &mut Frame, area: Rect, a: &mut App) {
-    a.fix_selection();
     let v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(5), Constraint::Length(4)]).split(area);
-    let view = a.proc_view();
+    let view = a.fix_selection();
     let cur = view.iter().position(|(_, i)| a.plist[*i].pid == a.proc_sel).unwrap_or(0);
     let gpu = a.gpu_by_pid();
     let parents: std::collections::HashSet<i32> = a.plist.iter().map(|p| p.ppid).collect();
@@ -335,7 +334,7 @@ fn processes(f: &mut Frame, area: Rect, a: &mut App) {
     let arrow = if a.s.sort_desc { "▼" } else { "▲" };
     let heads: Vec<String> = PROC_COLS.iter().enumerate().map(|(i, c)| if i == a.s.sort_col && !(a.s.process_tree && a.filter[P_PROCESSES].is_empty()) { format!("{c} {arrow}") } else { c.to_string() }).collect();
     let hs: Vec<&str> = heads.iter().map(|s| s.as_str()).collect();
-    let extra = format!("{} total CPU {:.0}%{}", a.procs.len(), a.cpu.overall, if a.s.process_tree { " — tree" } else { "" });
+    let extra = format!("{} total CPU {:.0}%{}", a.procs().len(), a.cpu.overall, if a.s.process_tree { " — tree" } else { "" });
     let title = page_title(a, P_PROCESSES, &extra);
     let mut off = a.offset[P_PROCESSES];
     table_lazy(
@@ -481,7 +480,7 @@ fn perf_cpu(f: &mut Frame, c: Rect, a: &App) {
     let lines = vec![
         line("Utilization", format!("{:.1}%   kernel {:.1}%", a.cpu.overall, a.cpu.kernel)),
         line("Speed (avg / base)", format!("{avg:.0} MHz / {}", st.base_mhz.map(|m| format!("{m:.0} MHz")).unwrap_or_else(|| "n/a".into()))),
-        line("Processes / threads", format!("{} / {}", a.procs.len(), a.procs.iter().map(|p| p.threads as u64).sum::<u64>())),
+        line("Processes / threads", format!("{} / {}", a.procs().len(), a.procs().iter().map(|p| p.threads as u64).sum::<u64>())),
         line("Up time", uptime_str(uptime_secs())),
         line("Cores / logical / sockets", format!("{} / {} / {}", st.physical, st.logical, st.sockets)),
         line("Caches", st.caches.iter().map(|(k, v)| format!("{k} {v}")).collect::<Vec<_>>().join("  ")),
@@ -1380,7 +1379,7 @@ pub fn capabilities(a: &App) -> Vec<(String, String)> {
     let root = unsafe { libc::geteuid() } == 0;
     vec![
         ("Running as root".into(), if root { "Yes".into() } else { "No — some per-process, RAPL and socket details need root".into() }),
-        ("Process telemetry (/proc)".into(), yes(!a.procs.is_empty())),
+        ("Process telemetry (/proc)".into(), yes(!a.procs().is_empty())),
         ("GPU telemetry".into(), if a.gpu_now.is_empty() { "Unsupported (no nvidia-smi / amdgpu sysfs data)".into() } else { format!("Supported ({} device(s))", a.gpu_now.len()) }),
         ("Hardware sensors (hwmon)".into(), yes(a.sensors.iter().any(|s| s.group == "Temperatures"))),
         ("Package power (RAPL)".into(), if a.restricted.is_empty() { yes(a.sensors.iter().any(|s| s.label.contains("package"))) } else { "Access needed (energy_uj is root-only)".into() }),

@@ -190,7 +190,7 @@ fn self_test(w: u16, h: u16) {
         }
     };
     let mut a = ready_app(P_SUMMARY);
-    check("processes", a.procs.len() > 5, format!("{} processes, {} threads", a.procs.len(), a.procs.iter().map(|p| p.threads).sum::<u32>()));
+    check("processes", a.procs().len() > 5, format!("{} processes, {} threads", a.procs().len(), a.procs().iter().map(|p| p.threads).sum::<u32>()));
     check("cpu", a.cpu_static.logical > 0 && a.cpu.per.len() == a.cpu_static.logical, format!("{} ({} logical / {} physical), {:.1}% busy", a.cpu_static.model, a.cpu_static.logical, a.cpu_static.physical, a.cpu.overall));
     check("memory", a.mem.total > 0, format!("{} total, {} used", util::bytes(a.mem.total as f64), util::bytes(a.mem.used as f64)));
     check("disks", !a.disks.is_empty(), a.disks.iter().map(|d| format!("{} {}", d.name, util::bytes(d.size as f64))).collect::<Vec<_>>().join(", "));

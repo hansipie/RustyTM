@@ -184,7 +184,8 @@ pub struct App {
     gpu_procs_wanted: Arc<AtomicBool>,
     pub sensors: Vec<Sensor>,
     pub restricted: Vec<String>,
-    pub procs: Vec<Proc>,
+    /// Number of live processes at the head of `plist` (exited ones, when shown, follow).
+    n_live: usize,
     pub plist: Vec<Proc>,
     exited: HashMap<i32, (Proc, Instant)>,
     smooth: HashMap<i32, f32>,
@@ -329,7 +330,7 @@ impl App {
             gpu_procs_wanted,
             sensors: vec![],
             restricted: vec![],
-            procs: vec![],
+            n_live: 0,
             plist: vec![],
             exited: HashMap::new(),
             smooth: HashMap::new(),
@@ -388,6 +389,11 @@ impl App {
         a.tick();
         a.enter_page();
         a
+    }
+
+    /// Live processes of the last sample.
+    pub fn procs(&self) -> &[Proc] {
+        &self.plist[..self.n_live]
     }
 
     pub fn say(&mut self, m: impl Into<String>) {
@@ -528,7 +534,7 @@ impl App {
         }
         let alive: HashSet<i32> = new.iter().map(|p| p.pid).collect();
         self.smooth.retain(|k, _| alive.contains(k));
-        for old in &self.procs {
+        for old in &self.plist[..self.n_live] {
             if !alive.contains(&old.pid) {
                 let mut e = old.clone();
                 e.state = 'X';
@@ -550,8 +556,8 @@ impl App {
             cur.insert(p.pid, (p.cpu_ticks, p.read_bytes, p.write_bytes));
         }
         self.ah_prev = cur;
-        self.procs = new;
-        self.plist = self.procs.clone();
+        self.n_live = new.len();
+        self.plist = new;
         if self.s.show_exited {
             self.plist.extend(self.exited.values().map(|(p, _)| p.clone()));
         }
@@ -735,17 +741,24 @@ impl App {
     /// Processes page ordering: (tree depth, index into `plist`).
     pub fn proc_view(&self) -> Vec<(usize, usize)> {
         let f = &self.filter[P_PROCESSES];
-        let idx_ok = |p: &Proc| f.is_empty() || { let q = f.to_lowercase(); p.name.to_lowercase().contains(&q) || p.user.to_lowercase().contains(&q) || p.pid.to_string() == *f || p.cmdline.to_lowercase().contains(&q) };
+        let q = f.to_lowercase();
+        let idx_ok = |p: &Proc| f.is_empty() || p.name.to_lowercase().contains(&q) || p.user.to_lowercase().contains(&q) || p.pid.to_string() == *f || p.cmdline.to_lowercase().contains(&q);
         if self.s.process_tree && f.is_empty() {
             return proc::tree_order(&self.plist, &self.collapsed);
         }
         let mut v: Vec<usize> = (0..self.plist.len()).filter(|&i| idx_ok(&self.plist[i])).collect();
         let col = self.s.sort_col.min(PROC_COLS.len() - 1);
         let gpu = if col >= 9 { self.gpu_by_pid() } else { Default::default() };
+        if col == 0 {
+            v.sort_by_cached_key(|&i| self.plist[i].name.to_lowercase());
+            if self.s.sort_desc {
+                v.reverse();
+            }
+            return v.into_iter().map(|i| (0, i)).collect();
+        }
         v.sort_by(|&a, &b| {
             let (x, y) = (&self.plist[a], &self.plist[b]);
             let o = match col {
-                0 => x.name.to_lowercase().cmp(&y.name.to_lowercase()),
                 1 => x.pid.cmp(&y.pid),
                 2 => x.cpu.partial_cmp(&y.cpu).unwrap_or(std::cmp::Ordering::Equal),
                 3 => x.rss.cmp(&y.rss),
@@ -763,13 +776,14 @@ impl App {
     }
 
     /// Keeps the selection on a visible row (first row when nothing valid is selected).
-    pub fn fix_selection(&mut self) {
+    pub fn fix_selection(&mut self) -> Vec<(usize, usize)> {
         let view = self.proc_view();
         if !view.iter().any(|(_, i)| self.plist[*i].pid == self.proc_sel) {
             if let Some((_, i)) = view.first() {
                 self.proc_sel = self.plist[*i].pid;
             }
         }
+        view
     }
 
     pub fn selected_proc(&self) -> Option<&Proc> {
@@ -812,7 +826,7 @@ impl App {
 
     pub fn users_view(&self) -> Vec<(u32, String, Vec<&Session>, usize, f32, u64)> {
         let mut m: HashMap<u32, (String, usize, f32, u64)> = HashMap::new();
-        for p in &self.procs {
+        for p in self.procs() {
             let e = m.entry(p.uid).or_insert_with(|| (p.user.clone(), 0, 0.0, 0));
             e.1 += 1;
             e.2 += p.cpu;
@@ -1178,8 +1192,7 @@ impl App {
     }
 
     fn key_processes(&mut self, k: KeyEvent) {
-        self.fix_selection();
-        let view = self.proc_view();
+        let view = self.fix_selection();
         let cur = view.iter().position(|(_, i)| self.plist[*i].pid == self.proc_sel).unwrap_or(0);
         let mv = |me: &mut App, idx: usize| {
             if let Some((_, i)) = view.get(idx) {
@@ -1231,7 +1244,7 @@ impl App {
                 let sig = if k.code == KeyCode::Char('K') { 9 } else { 15 };
                 let mut pids = vec![p.pid];
                 if tree {
-                    pids.extend(proc::descendants(&self.procs, p.pid));
+                    pids.extend(proc::descendants(self.procs(), p.pid));
                 }
                 let how = if sig == 9 { "Force terminate" } else { "Terminate" };
                 let text = if tree && pids.len() > 1 {
@@ -1284,7 +1297,7 @@ impl App {
                     self.say("Searching online…");
                 }
             }
-            KeyCode::Char('m') => match proc::sample_report(&self.procs, &data_dir().join("reports")) {
+            KeyCode::Char('m') => match proc::sample_report(self.procs(), &data_dir().join("reports")) {
                 Ok(p) => self.say(format!("The file was written to: {}", p.display())),
                 Err(e) => self.say(format!("The sample report could not be written: {e}")),
             },

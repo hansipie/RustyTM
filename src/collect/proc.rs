@@ -80,8 +80,33 @@ fn parse_stat(txt: &str) -> Option<(String, Vec<&str>)> {
     Some((name, rest))
 }
 
+/// Per-process data that does not change during the life of a PID (identified by its start time).
+struct Meta {
+    start: u64,
+    uid: u32,
+    user: String,
+    cmdline: String,
+}
+
+/// The command line is re-read every this many samples (a process can rewrite its own argv).
+const CMDLINE_REFRESH: u32 = 10;
+
+fn read_cmdline(base: &str) -> String {
+    std::fs::read(format!("{base}/cmdline"))
+        .map(|b| {
+            b.split(|c| *c == 0)
+                .filter(|s| !s.is_empty())
+                .map(|s| String::from_utf8_lossy(s).into_owned())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_default()
+}
+
 #[derive(Default)]
 pub struct ProcSampler {
+    meta: HashMap<i32, Meta>,
+    cycle: u32,
     prev: HashMap<i32, (u64, u64, u64)>, // ticks, read, write
     at: Option<Instant>,
     users: HashMap<u32, String>,
@@ -100,8 +125,11 @@ impl ProcSampler {
     pub fn sample(&mut self, per_core: bool) -> Vec<Proc> {
         let now = Instant::now();
         let dt = self.at.map(|t| now.duration_since(t).as_secs_f64()).unwrap_or(0.0);
-        let mut out = Vec::new();
-        let mut cur = HashMap::new();
+        let mut out = Vec::with_capacity(self.prev.len() + 16);
+        let mut cur = HashMap::with_capacity(self.prev.len() + 16);
+        let mut meta: HashMap<i32, Meta> = HashMap::with_capacity(self.meta.len() + 16);
+        let refresh_cmd = self.cycle % CMDLINE_REFRESH == 0;
+        self.cycle = self.cycle.wrapping_add(1);
         if let Ok(rd) = std::fs::read_dir("/proc") {
             for e in rd.flatten() {
                 let fname = e.file_name();
@@ -112,16 +140,20 @@ impl ProcSampler {
                 let utime: u64 = f[11].parse().unwrap_or(0);
                 let stime: u64 = f[12].parse().unwrap_or(0);
                 let ticks = utime + stime;
-                let uid = std::fs::metadata(&base).map(|m| m.uid()).unwrap_or(0);
-                let cmdline = std::fs::read(format!("{base}/cmdline"))
-                    .map(|b| {
-                        b.split(|c| *c == 0)
-                            .filter(|s| !s.is_empty())
-                            .map(|s| String::from_utf8_lossy(s).into_owned())
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    })
-                    .unwrap_or_default();
+                let start: u64 = f[19].parse().unwrap_or(0);
+                let m = match self.meta.remove(&pid) {
+                    Some(mut m) if m.start == start => {
+                        if refresh_cmd {
+                            m.cmdline = read_cmdline(&base);
+                        }
+                        m
+                    }
+                    _ => {
+                        let uid = std::fs::metadata(&base).map(|m| m.uid()).unwrap_or(0);
+                        let user = self.users.get(&uid).cloned().unwrap_or_else(|| uid.to_string());
+                        Meta { start, uid, user, cmdline: read_cmdline(&base) }
+                    }
+                };
                 let (mut rb, mut wb) = (0u64, 0u64);
                 if let Ok(io) = std::fs::read_to_string(format!("{base}/io")) {
                     for l in io.lines() {
@@ -146,10 +178,10 @@ impl ProcSampler {
                     pid,
                     ppid: f[1].parse().unwrap_or(0),
                     name,
-                    cmdline,
+                    cmdline: m.cmdline.clone(),
                     state: f[0].chars().next().unwrap_or('?'),
-                    uid,
-                    user: self.users.get(&uid).cloned().unwrap_or_else(|| uid.to_string()),
+                    uid: m.uid,
+                    user: m.user.clone(),
                     cpu,
                     rss: f[21].parse::<u64>().unwrap_or(0) * self.page,
                     threads: f[17].parse().unwrap_or(1),
@@ -160,9 +192,11 @@ impl ProcSampler {
                     write_rate: wr,
                     cpu_ticks: ticks,
                 });
+                meta.insert(pid, m);
             }
         }
         self.prev = cur;
+        self.meta = meta;
         self.at = Some(now);
         out
     }
