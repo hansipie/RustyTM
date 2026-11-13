@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.2 - 2026-11-13
+
+### Changed
+- Page order in the left list: Summary, Processes, Performance, Connections, Thermals, Battery, Power & Freq, Disk Space, Disk Health, Installed Apps, App history, Startup apps, Services, Drivers, Users, System Info, Flight Recorder, Benchmarks, Settings. The list in `rustytm --help` follows the same order. The last page you left is remembered by its position, so after updating RustyTM may reopen once on a neighbouring page.
+
 ## 1.5.1 - 2026-11-04
 
 ### Changed
