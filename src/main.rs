@@ -20,10 +20,10 @@ const HELP: &str = "RustyTM — task manager for Linux
 USAGE: rustytm [OPTIONS]
        rustytm update       check crates.io and reinstall the latest version (via cargo)
 
-  --page=<name>        open on a page (summary, processes, performance, app-history, startup,
-                       users, services, system-info, power-freq, thermals, battery, flight-recorder,
-                       connections, installed-apps, drivers, disk-space, benchmarks, disk-health,
-                       settings)
+  --page=<name>        open on a page (summary, processes, performance, connections, thermals,
+                       battery, power-freq, disk-space, disk-health, installed-apps,
+                       app-history, startup, services, drivers, users, system-info,
+                       flight-recorder, benchmarks, settings)
   --dump=<page>        render one page as plain text (80x40..) and exit; no terminal needed
   --size=WxH           size used by --dump (default 150x45)
   --self-test          collect everything once, render every page headlessly, print a report

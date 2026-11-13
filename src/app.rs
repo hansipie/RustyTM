@@ -15,27 +15,27 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub const PAGES: [&str; 19] = [
-    "Summary", "Processes", "Performance", "App history", "Startup apps", "Users", "Services", "System Info", "Power & Freq", "Thermals", "Battery", "Flight Recorder", "Connections", "Installed Apps", "Drivers", "Disk Space", "Benchmarks", "Disk Health", "Settings",
+    "Summary", "Processes", "Performance", "Connections", "Thermals", "Battery", "Power & Freq", "Disk Space", "Disk Health", "Installed Apps", "App history", "Startup apps", "Services", "Drivers", "Users", "System Info", "Flight Recorder", "Benchmarks", "Settings",
 ];
 pub const N_PAGES: usize = PAGES.len();
 pub const P_SUMMARY: usize = 0;
 pub const P_PROCESSES: usize = 1;
 pub const P_PERF: usize = 2;
-pub const P_APPHIST: usize = 3;
-pub const P_STARTUP: usize = 4;
-pub const P_USERS: usize = 5;
-pub const P_SERVICES: usize = 6;
-pub const P_SYSINFO: usize = 7;
-pub const P_POWER: usize = 8;
-pub const P_THERMAL: usize = 9;
-pub const P_BATTERY: usize = 10;
-pub const P_RECORDER: usize = 11;
-pub const P_CONN: usize = 12;
-pub const P_APPS: usize = 13;
-pub const P_DRIVERS: usize = 14;
-pub const P_DISK: usize = 15;
-pub const P_BENCH: usize = 16;
-pub const P_HEALTH: usize = 17;
+pub const P_THERMAL: usize = 4;
+pub const P_BATTERY: usize = 5;
+pub const P_APPHIST: usize = 10;
+pub const P_STARTUP: usize = 11;
+pub const P_USERS: usize = 14;
+pub const P_SERVICES: usize = 12;
+pub const P_SYSINFO: usize = 15;
+pub const P_POWER: usize = 6;
+pub const P_RECORDER: usize = 16;
+pub const P_CONN: usize = 3;
+pub const P_APPS: usize = 9;
+pub const P_DRIVERS: usize = 13;
+pub const P_DISK: usize = 7;
+pub const P_BENCH: usize = 17;
+pub const P_HEALTH: usize = 8;
 pub const P_SETTINGS: usize = 18;
 
 pub const HIST_LEN: usize = 120;
