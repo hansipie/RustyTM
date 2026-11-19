@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 - 2026-11-19
+
+### Added
+- Wi-Fi network name (SSID) shown in the Performance page's network details, under the interface name. It is refreshed every 10 seconds and hidden when the interface is not connected to a Wi-Fi network.
+
+### Fixed
+- Flight Recorder replay: PgUp, PgDn, Home and End now move through the replayed samples (PgUp/PgDn by 30 samples) instead of moving the selection in the trace list.
+- Filter prompt (`/`): Esc now cancels the edit and restores the previous filter. Before, the text typed so far was kept. Enter still keeps the new filter.
+
 ## 1.5.2 - 2026-11-13
 
 ### Changed

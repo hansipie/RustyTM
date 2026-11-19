@@ -74,7 +74,8 @@ pub fn push(h: &mut VecDeque<u64>, v: u64) {
 }
 
 pub enum PromptKind {
-    Filter,
+    /// Holds the filter as it was before editing, so Esc can restore it.
+    Filter(String),
     Affinity(i32),
     Nice(i32),
     Signal(i32),
@@ -1008,7 +1009,7 @@ impl App {
                 return;
             }
             KeyCode::Char('/') if !matches!(self.page, P_SUMMARY | P_PERF | P_SYSINFO | P_BENCH | P_SETTINGS | P_DISK | P_RECORDER | P_HEALTH) => {
-                self.prompt = Some(Prompt { kind: PromptKind::Filter, label: format!("Filter {}", PAGES[self.page]), buf: self.filter[self.page].clone() });
+                self.prompt = Some(Prompt { kind: PromptKind::Filter(self.filter[self.page].clone()), label: format!("Filter {}", PAGES[self.page]), buf: self.filter[self.page].clone() });
                 return;
             }
             KeyCode::Esc if !self.filter[self.page].is_empty() => {
@@ -1017,9 +1018,9 @@ impl App {
             }
             _ => {}
         }
-        // list navigation
+        // list navigation (not during a replay: PgUp/PgDn/Home/End move through the samples)
         let n = self.row_count(self.page);
-        if !matches!(self.page, P_PROCESSES | P_SYSINFO | P_THERMAL) {
+        if !replaying && !matches!(self.page, P_PROCESSES | P_SYSINFO | P_THERMAL) {
             let sel = &mut self.sel[self.page];
             let sel_before = *sel;
             match k.code {
@@ -1090,16 +1091,21 @@ impl App {
     fn prompt_key(&mut self, k: KeyEvent) {
         let Some(p) = &mut self.prompt else { return };
         match k.code {
-            KeyCode::Esc => self.prompt = None,
+            KeyCode::Esc => {
+                // "Esc to cancel": the filter is applied live while typing, so put the old one back
+                if let Some(Prompt { kind: PromptKind::Filter(orig), .. }) = self.prompt.take() {
+                    self.filter[self.page] = orig;
+                }
+            }
             KeyCode::Backspace => {
                 p.buf.pop();
-                if matches!(p.kind, PromptKind::Filter) {
+                if matches!(p.kind, PromptKind::Filter(_)) {
                     self.filter[self.page] = p.buf.clone();
                 }
             }
             KeyCode::Char(c) => {
                 p.buf.push(c);
-                if matches!(p.kind, PromptKind::Filter) {
+                if matches!(p.kind, PromptKind::Filter(_)) {
                     self.filter[self.page] = p.buf.clone();
                     self.sel[self.page] = 0;
                 }
@@ -1115,7 +1121,7 @@ impl App {
     fn prompt_done(&mut self, p: Prompt) {
         let v = p.buf.trim().to_string();
         match p.kind {
-            PromptKind::Filter => self.filter[self.page] = v,
+            PromptKind::Filter(_) => self.filter[self.page] = v,
             PromptKind::Run => {
                 if v.is_empty() {
                     return;
@@ -1714,3 +1720,55 @@ pub const SETTINGS_ITEMS: [&str; 15] = [
     "Confirm before stopping a disk scan",
     "Reset all settings…",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key(c: KeyCode) -> KeyEvent {
+        KeyEvent::from(c)
+    }
+
+    fn replaying_app() -> App {
+        let mut a = App::new(Settings::default());
+        a.page = P_RECORDER;
+        a.traces = vec![PathBuf::from("a"), PathBuf::from("b"), PathBuf::from("c")];
+        let trace = Trace { samples: vec![Sample::default(); 100], ..Default::default() };
+        a.replay = Some(Replay { trace, pos: 50, playing: false, last: Instant::now() });
+        a
+    }
+
+    // help: "PgUp/PgDn ±30 samples" while replaying, even with several saved traces listed
+    #[test]
+    fn replay_page_keys_move_the_replay_not_the_trace_list() {
+        let mut a = replaying_app();
+        a.on_key(key(KeyCode::PageDown));
+        assert_eq!(a.replay.as_ref().unwrap().pos, 80);
+        a.on_key(key(KeyCode::PageUp));
+        assert_eq!(a.replay.as_ref().unwrap().pos, 50);
+        a.on_key(key(KeyCode::End));
+        assert_eq!(a.replay.as_ref().unwrap().pos, 99);
+        a.on_key(key(KeyCode::Home));
+        assert_eq!(a.replay.as_ref().unwrap().pos, 0);
+        assert_eq!(a.sel[P_RECORDER], 0);
+    }
+
+    // prompt title: "Enter to accept, Esc to cancel"
+    #[test]
+    fn esc_cancels_filter_edit_and_restores_previous_filter() {
+        let mut a = App::new(Settings::default());
+        a.page = P_SERVICES;
+        a.filter[P_SERVICES] = "ssh".into();
+        a.on_key(key(KeyCode::Char('/')));
+        a.on_key(key(KeyCode::Char('x')));
+        assert_eq!(a.filter[P_SERVICES], "sshx");
+        a.on_key(key(KeyCode::Esc));
+        assert!(a.prompt.is_none());
+        assert_eq!(a.filter[P_SERVICES], "ssh");
+        // Enter keeps the edit
+        a.on_key(key(KeyCode::Char('/')));
+        a.on_key(key(KeyCode::Char('d')));
+        a.on_key(key(KeyCode::Enter));
+        assert_eq!(a.filter[P_SERVICES], "sshd");
+    }
+}
