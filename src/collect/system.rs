@@ -375,11 +375,22 @@ pub struct NetStat {
     pub ipv6: Vec<String>,
     pub up: bool,
     pub wireless: bool,
+    /// Name of the Wi-Fi network the interface is connected to (None when not connected / not wireless).
+    pub ssid: Option<String>,
 }
 
 #[derive(Default)]
 pub struct NetSampler {
     prev: HashMap<String, (u64, u64, Instant)>,
+    /// SSID cache per interface, refreshed slowly to avoid spawning a process on every tick.
+    ssids: HashMap<String, (Instant, Option<String>)>,
+}
+
+const SSID_REFRESH: std::time::Duration = std::time::Duration::from_secs(10);
+
+fn read_ssid(iface: &str) -> Option<String> {
+    let from_iw = run("iw", &["dev", iface, "link"]).and_then(|t| t.lines().find_map(|l| l.trim().strip_prefix("SSID:").map(|r| r.trim().to_string())));
+    from_iw.or_else(|| run("iwgetid", &[iface, "-r"]).map(|t| t.trim().to_string())).filter(|x| !x.is_empty())
 }
 
 fn addresses() -> HashMap<String, (Vec<String>, Vec<String>)> {
@@ -449,6 +460,15 @@ impl NetSampler {
                     s.rx_rate = rx.saturating_sub(*prx) as f64 / dt;
                     s.tx_rate = tx.saturating_sub(*ptx) as f64 / dt;
                 }
+            }
+            if s.wireless && s.up {
+                let stale = self.ssids.get(&name).map_or(true, |(t, _)| now.duration_since(*t) >= SSID_REFRESH);
+                if stale {
+                    self.ssids.insert(name.clone(), (now, read_ssid(&name)));
+                }
+                s.ssid = self.ssids.get(&name).and_then(|(_, v)| v.clone());
+            } else {
+                self.ssids.remove(&name);
             }
             self.prev.insert(name, (rx, tx, now));
             out.push(s);

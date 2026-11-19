@@ -571,6 +571,9 @@ fn perf_net(f: &mut Frame, c: Rect, a: &App, i: Option<usize>) {
     let mut l = Vec::new();
     for n in sel {
         l.push(line(&format!("{}{}", n.name, if n.up { "" } else { " (down)" }), if n.wireless { "Wi-Fi".into() } else { "Ethernet / other".into() }));
+        if let Some(ssid) = &n.ssid {
+            l.push(line("  Network name (SSID)", ssid.clone()));
+        }
         l.push(line("  Hardware address", n.mac.clone()));
         l.push(line("  IPv4 address", n.ipv4.join(", ")));
         l.push(line("  IPv6 address", n.ipv6.join(", ")));
