@@ -90,7 +90,14 @@ Claude Code (Enter on "copy the Claude Code setup command" copies it):
 
 Without the UI: `rustytm --mcp-http[=PORT]` serves the same endpoint headless (it prints the command
 above), and `rustytm --mcp` speaks MCP on stdin/stdout for clients that launch the program themselves
-(`claude mcp add rustytm -- rustytm --mcp`).
+(`claude mcp add rustytm -- rustytm --mcp`). Both start the server whatever the Settings page says:
+launching them is the opt-in. They use the same "allow actions" setting.
+
+Security: the server listens on `127.0.0.1` only and refuses requests without the token, or coming
+from a web page of another site (Origin check). Requests are limited to 1 MB and 10 seconds, and
+clients that have not sent the token yet get only a few connection slots, so they cannot lock out
+yours. The token is kept in `settings.json`, which RustyTM writes readable by you only (mode 600),
+and `get_settings` never returns it.
 
 Read tools (always available): `get_overview`, `get_cpu`, `get_memory`, `get_disks`, `get_network`,
 `get_gpus` (with per-process GPU use), `get_history`, `list_processes` (filter, sort, limit),
@@ -98,6 +105,7 @@ Read tools (always available): `get_overview`, `get_cpu`, `get_memory`, `get_dis
 `get_installed_apps`, `get_disk_health`, `get_startup_apps`, `get_services`, `get_users`,
 `get_system_info`, `get_app_history`, `get_disk_scan`, `get_benchmarks`, `get_recorder`, `get_trace`,
 `get_settings`. Data collected in the background (services, connections...) is gathered on demand.
+`get_trace` only reads `.rustytmtrace` files from the Flight Recorder folder.
 
 Action tools, only listed when **MCP server: allow actions** is on (off by default):
 `signal_process` (terminate, kill, stop, continue, any signal, optionally the whole tree),
@@ -107,8 +115,14 @@ Action tools, only listed when **MCP server: allow actions** is on (off by defau
 `start_benchmark`, `cancel_benchmark`, `clear_benchmark_history`, `start_recording`,
 `stop_recording`, `save_recording`, `discard_recording`, `export_system_info`, `clear_app_history`,
 `change_setting` (not the MCP settings), `show_page`. They act at once, without the confirmation the
-UI asks for, and run with your rights; each one is announced in the status bar. "New access token"
-on the Settings page revokes the clients set up so far.
+UI asks for, and run with your rights; each one is announced in the status bar. `run_program` lets
+the assistant run any command as you: allow actions only for a client whose permission prompts you
+trust. "New access token" on the Settings page revokes the clients set up so far.
+
+Service and session actions (from the UI or MCP) run in the background, so the screen never freezes
+while systemctl, loginctl or the pkexec password dialog runs. One action at a time per service or
+session; the status bar shows each result, failures first. They are stopped after 120 seconds
+without an answer.
 
 Not implemented: video (WebM) recording, tray gadgets / pop-out / screensaver /
 global shortcut (these need a GUI toolkit), localisation.
