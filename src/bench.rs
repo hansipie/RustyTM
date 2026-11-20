@@ -55,7 +55,7 @@ impl BenchResult {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct BenchState {
     pub running: bool,
     pub label: String,

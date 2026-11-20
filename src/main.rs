@@ -4,6 +4,7 @@ mod charts;
 mod collect;
 mod diskscan;
 mod draw;
+mod mcp;
 mod recorder;
 mod settings;
 mod update;
@@ -30,6 +31,8 @@ USAGE: rustytm [OPTIONS]
   --record[=SECS]      headless Flight Recorder: sample once a second (default 10 s) and save a trace
   --replay=<file>      validate a .rustytmtrace file and print its summary
   --bench=<kind>       run a benchmark without UI: cpu | disk | gpu | internet | all
+  --mcp                MCP server on stdin/stdout (for AI assistants that launch RustyTM), no UI
+  --mcp-http[=PORT]    MCP server over HTTP on 127.0.0.1 (default: the Settings port), no UI
   --reset-settings     delete the settings file
   --version, --help
 ";
@@ -75,6 +78,15 @@ fn main() {
     if let Some(k) = arg(&args, "--bench") {
         return headless_bench(k);
     }
+    if has(&args, "--mcp") {
+        return headless_mcp(None);
+    }
+    if has(&args, "--mcp-http") {
+        return headless_mcp(Some(arg(&args, "--mcp-http").map(|p| p.parse().unwrap_or_else(|_| {
+            eprintln!("invalid port '{p}'");
+            std::process::exit(2);
+        }))));
+    }
     if has(&args, "--record") {
         let secs = arg(&args, "--record").and_then(|s| s.parse().ok()).unwrap_or(10);
         return headless_record(secs);
@@ -103,6 +115,7 @@ fn main() {
         }
     }
     let mut a = App::new(s);
+    a.sync_mcp();
     let upd = update::start_check();
     let mut term = ratatui::init();
     let res = (|| -> std::io::Result<()> {
@@ -115,7 +128,9 @@ fn main() {
                 dirty = false;
             }
             let interval = Duration::from_millis(a.s.refresh_ms.max(250));
-            let wait = interval.saturating_sub(a.last_tick.elapsed()).min(Duration::from_millis(200));
+            // MCP requests are answered between frames: poll more often while the server runs
+            let cap = if a.mcp.is_some() { 50 } else { 200 };
+            let wait = interval.saturating_sub(a.last_tick.elapsed()).min(Duration::from_millis(cap));
             if event::poll(wait)? {
                 match event::read()? {
                     Event::Key(k) if k.kind != KeyEventKind::Release => {
@@ -132,6 +147,9 @@ fn main() {
             }
             // background work reports progress between samples; redraw once more when it finishes
             if a.sync_gpu_procs() {
+                dirty = true;
+            }
+            if a.mcp_poll() {
                 dirty = true;
             }
             let busy = a.bench.running() || a.scanner.running() || a.loading(a.page);
@@ -332,4 +350,46 @@ fn headless_bench(kind: &str) {
             return;
         }
     }
+}
+
+/// Runs the MCP server without the UI: stdio (`None`) or HTTP on a port (`Some(None)` = the Settings port).
+fn headless_mcp(http: Option<Option<u16>>) {
+    let mut s = load_settings();
+    let handle = match http {
+        None => mcp::serve_stdio(s.mcp_allow_actions),
+        Some(port) => {
+            if s.mcp_token.is_empty() {
+                s.mcp_token = mcp::new_token();
+                if let Err(e) = s.save() {
+                    eprintln!("warning: the new MCP token could not be saved: {e}");
+                }
+            }
+            let port = port.unwrap_or(s.mcp_port);
+            match mcp::serve_http(port, s.mcp_token.clone(), s.mcp_allow_actions) {
+                Ok(h) => {
+                    eprintln!("RustyTM MCP server listening on {} (actions {})", h.url().unwrap_or_default(), if s.mcp_allow_actions { "allowed" } else { "off: read-only" });
+                    eprintln!("Add it to Claude Code with:\n  {}", h.claude_command().unwrap_or_default());
+                    h
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+    };
+    let mut a = App::new(s);
+    a.mcp = Some(handle);
+    loop {
+        a.mcp_poll();
+        if a.mcp.as_ref().is_some_and(|h| h.closed.load(std::sync::atomic::Ordering::SeqCst)) {
+            break;
+        }
+        if a.last_tick.elapsed() >= Duration::from_millis(a.s.refresh_ms.max(250)) {
+            a.tick();
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    // settings are saved when changed; leave the file alone otherwise (a TUI may be running too)
+    a.save_app_history();
 }

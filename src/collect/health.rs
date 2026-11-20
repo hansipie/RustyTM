@@ -1,7 +1,7 @@
 use crate::util::*;
 use std::process::Command;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct DiskHealth {
     pub dev: String,
     pub model: String,
@@ -20,7 +20,7 @@ pub struct DiskHealth {
     pub note: String,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct HealthResult {
     pub disks: Vec<DiskHealth>,
     pub notes: Vec<String>,

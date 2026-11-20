@@ -23,6 +23,13 @@ pub struct Settings {
     pub last_page: usize,
     pub bench_dir: String,
     pub collapsed: Vec<i32>,
+    /// MCP server for AI assistants (HTTP on 127.0.0.1)
+    pub mcp_enabled: bool,
+    pub mcp_port: u16,
+    /// let MCP clients act (signals, services, benchmarks...), not only read
+    pub mcp_allow_actions: bool,
+    /// access token MCP clients must send; generated when the server is first turned on
+    pub mcp_token: String,
 }
 
 impl Default for Settings {
@@ -47,6 +54,10 @@ impl Default for Settings {
             last_page: 0,
             bench_dir: String::new(),
             collapsed: vec![],
+            mcp_enabled: false,
+            mcp_port: crate::mcp::DEFAULT_PORT,
+            mcp_allow_actions: false,
+            mcp_token: String::new(),
         }
     }
 }
@@ -68,7 +79,17 @@ impl Settings {
         let p = path();
         std::fs::create_dir_all(p.parent().unwrap()).map_err(|e| e.to_string())?;
         let tmp = p.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_string_pretty(self).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        let text = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        // owner-only: the file holds the MCP access token
+        {
+            use std::io::Write;
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&tmp).map_err(|e| e.to_string())?;
+            // `mode` only applies to a new file (and passes through the umask): set it explicitly
+            f.set_permissions(std::fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
+            f.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+        }
+        // the 0600 file replaces the old one, whatever its permissions were
         std::fs::rename(tmp, p).map_err(|e| e.to_string())
     }
 

@@ -17,7 +17,7 @@ pub fn category(ext: &str) -> usize {
     if has(MEDIA) { 0 } else if has(DOCS) { 1 } else if has(ARCH) { 2 } else if has(APPS) { 3 } else { 4 }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct ScanState {
     pub root: PathBuf,
     pub running: bool,

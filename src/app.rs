@@ -14,6 +14,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+mod mcp_tools;
+
 pub const PAGES: [&str; 19] = [
     "Summary", "Processes", "Performance", "Connections", "Thermals", "Battery", "Power & Freq", "Disk Space", "Disk Health", "Installed Apps", "App history", "Startup apps", "Services", "Drivers", "Users", "System Info", "Flight Recorder", "Benchmarks", "Settings",
 ];
@@ -83,6 +85,7 @@ pub enum PromptKind {
     ScanPath,
     BenchDir,
     TraceFile,
+    McpPort,
 }
 
 pub struct Prompt {
@@ -148,6 +151,66 @@ pub struct BatHist {
     pub watts: VecDeque<u64>,
     /// smoothed power, W: steadies the time estimate
     pub ema: Option<f64>,
+}
+
+/// Locks every session in `ids`: Ok when all locked, otherwise Err naming what locked and each failure.
+fn lock_all(ids: &[String], lock: impl Fn(&str) -> Result<(), String>) -> Result<String, String> {
+    let (mut locked, mut failed) = (Vec::new(), Vec::new());
+    for id in ids {
+        match lock(id) {
+            Ok(()) => locked.push(id.as_str()),
+            Err(e) => failed.push(format!("session {id}: {e}")),
+        }
+    }
+    if failed.is_empty() {
+        return Ok(format!("Locked session {}", locked.join(", ")));
+    }
+    let done = if locked.is_empty() { String::new() } else { format!("Locked session {}; ", locked.join(", ")) };
+    Err(format!("{done}not locked: {}", failed.join("; ")))
+}
+
+/// The action results on the status line (see `App::say_results`).
+struct ActionMsg {
+    /// `App::msg_seq` of the message that shows them: any other message in between starts afresh
+    seq: u64,
+    /// older failures that are only counted ("+N earlier failures")
+    earlier: usize,
+    /// (ok, text), oldest first
+    parts: Vec<(bool, String)>,
+}
+
+/// An action that ran off the UI thread and has ended (see `App::begin_action`).
+pub(crate) struct ActionDone {
+    pub msg: String,
+    pub ok: bool,
+    pub page: usize,
+    pub targets: Vec<String>,
+}
+
+/// Held by an off-thread action while it runs. It reports to the UI when finished, and also when
+/// dropped unfinished (a panic, or a client gone before the work ran), so its targets never stay busy.
+pub(crate) struct ActionTicket {
+    tx: std::sync::mpsc::Sender<ActionDone>,
+    page: usize,
+    targets: Vec<String>,
+    result: Option<Result<String, String>>,
+}
+
+impl ActionTicket {
+    pub fn finish(mut self, r: Result<String, String>) {
+        self.result = Some(r);
+    }
+}
+
+impl Drop for ActionTicket {
+    fn drop(&mut self) {
+        let r = self.result.take().unwrap_or_else(|| Err("The action did not complete.".into()));
+        let (ok, msg) = match r {
+            Ok(m) => (true, m),
+            Err(e) => (false, e),
+        };
+        let _ = self.tx.send(ActionDone { msg, ok, page: self.page, targets: std::mem::take(&mut self.targets) });
+    }
 }
 
 pub struct App {
@@ -241,6 +304,14 @@ pub struct App {
     pub sysinfo: Vec<InfoSection>,
     sysinfo_bg: Bg<Vec<InfoSection>>,
     pub loaded_at: HashMap<usize, Instant>,
+    /// pages to reload as soon as their running collection ends (it may have missed an action's effect)
+    reload_after: HashSet<usize>,
+    /// what off-thread actions are working on ("service:x.service", "session:3"): one action at a time each
+    actions_running: HashSet<String>,
+    /// bumped by every `say`, so code can tell whether the status message is still the one it set
+    msg_seq: u64,
+    /// the action results the status message shows: several results in a row add up
+    action_msg: Option<ActionMsg>,
     pub sysinfo_scroll: u16,
 
     // disk space
@@ -259,6 +330,18 @@ pub struct App {
     pub replay: Option<Replay>,
     pub traces: Vec<PathBuf>,
     pub trace_pick: bool,
+
+    // MCP server
+    pub mcp: Option<crate::mcp::Handle>,
+    pub mcp_error: Option<String>,
+    /// when an MCP client last asked for per-process GPU data (keeps the GPU worker running)
+    mcp_gpu_since: Option<Instant>,
+    mcp_gpu_last: Option<Instant>,
+    /// slow work a tool leaves for the MCP transport thread (see `Outcome::Run`)
+    mcp_run: Option<Box<dyn FnOnce() -> Result<serde_json::Value, String> + Send>>,
+    /// off-thread actions (from the TUI or MCP) report here when they end: (status message, page whose data to reload)
+    action_done_tx: std::sync::mpsc::Sender<ActionDone>,
+    action_done_rx: std::sync::mpsc::Receiver<ActionDone>,
 }
 
 impl App {
@@ -312,6 +395,7 @@ impl App {
         let bench_dir = if s.bench_dir.is_empty() { std::env::temp_dir() } else { PathBuf::from(&s.bench_dir) };
         let collapsed = s.collapsed.iter().copied().collect();
         let page = s.last_page.min(PAGES.len() - 1);
+        let (action_done_tx, action_done_rx) = std::sync::mpsc::channel();
         let app_hist = std::fs::read_to_string(data_dir().join("app-history.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
         let mut a = App {
             s,
@@ -390,6 +474,10 @@ impl App {
             sysinfo: vec![],
             sysinfo_bg: Bg::new(),
             loaded_at: HashMap::new(),
+            reload_after: HashSet::new(),
+            actions_running: HashSet::new(),
+            msg_seq: 0,
+            action_msg: None,
             sysinfo_scroll: 0,
             scanner: Scanner::new(),
             mounts: vec![],
@@ -402,6 +490,13 @@ impl App {
             replay: None,
             traces: recorder::list_traces(),
             trace_pick: false,
+            mcp: None,
+            mcp_error: None,
+            mcp_gpu_since: None,
+            mcp_gpu_last: None,
+            mcp_run: None,
+            action_done_tx,
+            action_done_rx,
         };
         a.tick();
         a.enter_page();
@@ -410,7 +505,8 @@ impl App {
 
     /// Tells the per-process GPU worker whether the current page needs its data.
     fn sync_gpu_demand(&self) {
-        self.gpu_procs_wanted.store(matches!(self.page, P_PROCESSES | P_PERF), Ordering::Relaxed);
+        let mcp = self.mcp_gpu_last.is_some_and(|t| t.elapsed() < Duration::from_secs(30));
+        self.gpu_procs_wanted.store(mcp || matches!(self.page, P_PROCESSES | P_PERF), Ordering::Relaxed);
     }
 
     /// Picks up the worker's latest snapshot; true when it changed since the last call.
@@ -430,6 +526,7 @@ impl App {
     }
 
     pub fn say(&mut self, m: impl Into<String>) {
+        self.msg_seq += 1;
         self.msg = Some((m.into(), Instant::now()));
     }
 
@@ -443,6 +540,10 @@ impl App {
 
     pub fn persist_on_exit(&mut self) {
         self.save_settings();
+        self.save_app_history();
+    }
+
+    pub fn save_app_history(&self) {
         let _ = std::fs::create_dir_all(data_dir());
         if let Ok(t) = serde_json::to_string(&self.app_hist) {
             let _ = std::fs::write(data_dir().join("app-history.json"), t);
@@ -701,6 +802,59 @@ impl App {
         if let Some(v) = self.sysinfo_bg.poll() {
             self.sysinfo = v;
         }
+    }
+
+    /// Reserves `targets` for an off-thread action. Err (a message for the user) when an action on one
+    /// of them is still running, so the same unit or session never gets two overlapping commands.
+    pub(crate) fn begin_action(&mut self, page: usize, targets: Vec<String>) -> Result<ActionTicket, String> {
+        if let Some(t) = targets.iter().find(|t| self.actions_running.contains(*t)) {
+            let name = t.split_once(':').map_or(t.as_str(), |(_, n)| n);
+            return Err(format!("An action on {name} is still running."));
+        }
+        self.actions_running.extend(targets.iter().cloned());
+        Ok(ActionTicket { tx: self.action_done_tx.clone(), page, targets, result: None })
+    }
+
+    /// Runs a slow privileged command (systemctl, loginctl, pkexec) off the UI thread. The status bar
+    /// shows `start` now; when `f` ends, `mcp_poll` shows its message (or the error) and reloads `page`.
+    fn run_action(&mut self, start: String, page: usize, targets: Vec<String>, f: impl FnOnce() -> Result<String, String> + Send + 'static) {
+        match self.begin_action(page, targets) {
+            Err(e) => self.say(e),
+            Ok(ticket) => {
+                self.say(start);
+                std::thread::spawn(move || ticket.finish(f()));
+            }
+        }
+    }
+
+    /// Shows the results of actions that ended: failures first, and added to results still on
+    /// screen, so several actions ending close together do not hide one another.
+    /// Beyond 4 results, the oldest successes are dropped first; then the oldest failures are only
+    /// counted ("+N earlier failures"), so the line stays short.
+    pub(crate) fn say_results(&mut self, done: &[ActionDone]) {
+        let (mut earlier, mut parts) = match self.action_msg.take() {
+            Some(m) if m.seq == self.msg_seq && self.msg.is_some() => (m.earlier, m.parts),
+            _ => (0, Vec::new()),
+        };
+        let (bad, good): (Vec<&ActionDone>, Vec<&ActionDone>) = done.iter().partition(|d| !d.ok);
+        parts.extend(bad.iter().chain(&good).map(|d| (d.ok, d.msg.clone())));
+        // at most 4 pieces on the line, the "+N earlier failures" count being one of them. The newest
+        // piece always stays, so the latest action's result is always seen.
+        while parts.len() > if earlier > 0 { 3 } else { 4 } {
+            let newest = parts.len() - 1;
+            match parts[..newest].iter().position(|(ok, _)| *ok) {
+                Some(i) => {
+                    parts.remove(i);
+                }
+                None => {
+                    parts.remove(0);
+                    earlier += 1;
+                }
+            }
+        }
+        let count = (earlier > 0).then(|| format!("+{earlier} earlier failure{}", if earlier == 1 { "" } else { "s" }));
+        self.say(count.iter().map(String::as_str).chain(parts.iter().map(|(_, m)| m.as_str())).collect::<Vec<_>>().join(" · "));
+        self.action_msg = Some(ActionMsg { seq: self.msg_seq, earlier, parts });
     }
 
     pub fn loading(&self, page: usize) -> bool {
@@ -1126,7 +1280,7 @@ impl App {
                 if v.is_empty() {
                     return;
                 }
-                match std::process::Command::new("sh").arg("-c").arg(&v).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn() {
+                match run_detached(&v) {
                     Ok(_) => self.say(format!("Started: {v}")),
                     Err(_) => self.say(format!("Could not run \"{v}\".")),
                 }
@@ -1182,6 +1336,14 @@ impl App {
                 let pb = PathBuf::from(&v);
                 self.open_replay(&pb);
             }
+            PromptKind::McpPort => match v.parse::<u16>() {
+                Ok(p) if p >= 1024 => {
+                    self.s.mcp_port = p;
+                    self.sync_mcp();
+                    self.save_settings();
+                }
+                _ => self.say("The port must be a number between 1024 and 65535"),
+            },
         }
     }
 
@@ -1216,15 +1378,15 @@ impl App {
                     self.say(format!("Benchmark history was not saved: {e}"));
                 }
             }
-            Confirm::Disconnect(id, user) => match inv::terminate_session(&id) {
-                Ok(_) => self.say(format!("Signed off session {id} of {user}")),
-                Err(e) => self.say(e),
-            },
+            Confirm::Disconnect(id, user) => self.run_action(format!("Signing off session {id} of {user}…"), P_USERS, vec![format!("session:{id}")], move || {
+                inv::terminate_session(&id).map(|_| format!("Signed off session {id} of {user}"))
+            }),
             Confirm::Quit => self.quit = true,
             Confirm::DiscardTrace => self.rec = None,
             Confirm::ResetSettings => {
                 self.s = Settings::default();
                 crate::util::set_net_bits(false);
+                self.sync_mcp();
                 self.save_settings();
                 self.say("Settings reset.");
             }
@@ -1454,12 +1616,13 @@ impl App {
         match k.code {
             KeyCode::Char('l') => {
                 if let Some((_, _, ids)) = sel {
-                    for id in ids {
-                        match inv::lock_session(&id) {
-                            Ok(_) => self.say(format!("Locked session {id}")),
-                            Err(e) => self.say(e),
-                        }
+                    if ids.is_empty() {
+                        self.say("That user has no login session to lock.");
+                        return;
                     }
+                    // one action for all the user's sessions: one result that names what locked and every failure
+                    let targets = ids.iter().map(|id| format!("session:{id}")).collect();
+                    self.run_action(format!("Locking session {}…", ids.join(", ")), P_USERS, targets, move || lock_all(&ids, inv::lock_session));
                 }
             }
             KeyCode::Char('d') => {
@@ -1486,12 +1649,9 @@ impl App {
 
     fn key_services(&mut self, k: KeyEvent) {
         let sel = self.service_view().get(self.sel[P_SERVICES]).map(|s| (*s).clone());
-        let act = |me: &mut App, s: &Service, a: &str| match inv::service_action(&s.unit, a) {
-            Ok(_) => {
-                me.say(format!("{a} {} succeeded", s.unit));
-                me.refresh_page(P_SERVICES);
-            }
-            Err(e) => me.say(e),
+        let act = |me: &mut App, s: &Service, a: &str| {
+            let (unit, a) = (s.unit.clone(), a.to_string());
+            me.run_action(format!("{a} {unit}…"), P_SERVICES, vec![format!("service:{unit}")], move || inv::service_action(&unit, &a).map(|_| format!("{a} {unit} succeeded")));
         };
         match (k.code, sel) {
             (KeyCode::Char('s'), Some(s)) => act(self, &s, "start"),
@@ -1613,13 +1773,35 @@ impl App {
             11 => s.refresh_ms = match s.refresh_ms { 500 => 1000, 1000 => 2000, 2000 => 5000, _ => 500 },
             12 => s.light_theme = !s.light_theme,
             13 => s.confirm_stop_scan = !s.confirm_stop_scan,
-            14 => {
+            14 => s.mcp_enabled = !s.mcp_enabled,
+            15 => s.mcp_allow_actions = !s.mcp_allow_actions,
+            16 => {
+                self.prompt = Some(Prompt { kind: PromptKind::McpPort, label: "MCP server port (1024-65535)".into(), buf: s.mcp_port.to_string() });
+                return;
+            }
+            17 => {
+                let cmd = self.mcp.as_ref().and_then(|h| h.claude_command());
+                match cmd {
+                    Some(c) => {
+                        crate::draw::copy_osc52(&c);
+                        self.say("Claude Code setup command copied");
+                    }
+                    None => self.say("Turn the MCP server on first."),
+                }
+                return;
+            }
+            18 => {
+                s.mcp_token = crate::mcp::new_token();
+                self.say("New MCP access token: clients must be set up again.");
+            }
+            19 => {
                 self.confirm = Some(Confirm::ResetSettings);
                 return;
             }
             _ => {}
         }
         crate::util::set_net_bits(self.s.net_bits);
+        self.sync_mcp();
         self.save_settings();
     }
 
@@ -1703,7 +1885,7 @@ impl App {
     }
 }
 
-pub const SETTINGS_ITEMS: [&str; 15] = [
+pub const SETTINGS_ITEMS: [&str; 20] = [
     "Temperature unit (Celsius / Fahrenheit)",
     "Show exited processes",
     "Smooth CPU readings",
@@ -1718,12 +1900,35 @@ pub const SETTINGS_ITEMS: [&str; 15] = [
     "Refresh interval",
     "Light theme accents",
     "Confirm before stopping a disk scan",
+    "MCP server for AI assistants (127.0.0.1 only)",
+    "MCP server: allow actions (signals, services, benchmarks…)",
+    "MCP server port",
+    "MCP server: copy the Claude Code setup command",
+    "MCP server: new access token",
     "Reset all settings…",
 ];
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn locking_several_sessions_names_every_outcome() {
+        let ids: Vec<String> = ["1", "2", "3", "4", "5"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(lock_all(&ids, |_| Ok(())).unwrap(), "Locked session 1, 2, 3, 4, 5");
+        let e = lock_all(&ids, |id| if id == "2" { Ok(()) } else { Err(format!("no {id} · really")) }).unwrap_err();
+        assert_eq!(e, "Locked session 2; not locked: session 1: no 1 · really; session 3: no 3 · really; session 4: no 4 · really; session 5: no 5 · really");
+        // shown in full even with earlier results on screen and a " · " inside it
+        let mut a = App::new(Settings::default());
+        for i in 0..4 {
+            a.begin_action(P_HEALTH, vec![]).unwrap().finish(Ok(format!("ok {i}")));
+        }
+        a.mcp_poll();
+        a.begin_action(P_HEALTH, vec![]).unwrap().finish(Err(e.clone()));
+        a.begin_action(P_HEALTH, vec![]).unwrap().finish(Err("other failure".into()));
+        a.mcp_poll();
+        assert_eq!(a.msg.as_ref().unwrap().0, format!("ok 2 · ok 3 · {e} · other failure"));
+    }
 
     fn key(c: KeyCode) -> KeyEvent {
         KeyEvent::from(c)

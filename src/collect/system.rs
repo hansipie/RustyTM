@@ -4,7 +4,7 @@ use std::time::Instant;
 
 // ───────────────────────────── CPU ─────────────────────────────
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct CpuStatic {
     pub model: String,
     pub logical: usize,
@@ -90,7 +90,7 @@ pub fn cpu_static() -> CpuStatic {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct CpuUse {
     pub overall: f32,
     pub kernel: f32,
@@ -160,7 +160,7 @@ pub fn cpu_freqs(n: usize) -> Vec<f64> {
 
 // ───────────────────────────── Memory ─────────────────────────────
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct Mem {
     pub total: u64,
     pub available: u64,
@@ -213,7 +213,7 @@ pub fn mem() -> Mem {
 
 // ───────────────────────────── Disks ─────────────────────────────
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct DiskStat {
     pub name: String,
     pub model: String,
@@ -317,6 +317,7 @@ impl DiskSampler {
     }
 }
 
+#[derive(serde::Serialize)]
 pub struct MountUse {
     pub mount: String,
     pub fstype: String,
@@ -362,7 +363,7 @@ pub fn free_space(path: &std::path::Path) -> Option<u64> {
 
 // ───────────────────────────── Network ─────────────────────────────
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, serde::Serialize)]
 pub struct NetStat {
     pub name: String,
     pub rx_rate: f64,
@@ -479,7 +480,7 @@ impl NetSampler {
 
 // ───────────────────────────── GPU ─────────────────────────────
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, serde::Serialize)]
 pub struct GpuStat {
     pub name: String,
     pub vendor: String,
@@ -611,7 +612,7 @@ pub fn gpus() -> Vec<GpuStat> {
 
 // ───────────────────────────── Sensors ─────────────────────────────
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Sensor {
     pub group: &'static str,
     pub device: String,
@@ -752,7 +753,7 @@ pub fn sensors(rapl: &mut Rapl, freqs: &[f64], gpu_list: &[GpuStat]) -> SensorSe
 // ───────────────────────────── Battery ─────────────────────────────
 
 /// One battery from `/sys/class/power_supply`: the laptop's own, or a peripheral's (mouse, keyboard).
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize)]
 pub struct Battery {
     pub name: String,
     pub status: String,

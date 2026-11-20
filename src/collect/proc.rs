@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
 use std::time::Instant;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, serde::Serialize)]
 pub struct Proc {
     pub pid: i32,
     pub ppid: i32,

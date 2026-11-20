@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- MCP server for AI assistants (Claude Code and other MCP clients), off by default. Turn it on from the Settings page: RustyTM then serves MCP over HTTP on `127.0.0.1` (port 7419 by default, configurable), protected by an access token generated on first use. The Settings page shows the address and copies the `claude mcp add` command. 25 read tools cover every page (overview, CPU, memory, disks, network, GPUs and their processes, history, processes and process details, sensors, batteries, connections, drivers, installed apps, disk health, startup apps, services, users, system info, app history, disk scan, benchmarks, Flight Recorder and traces, settings).
+- MCP actions behind a separate setting, "MCP server: allow actions" (off by default): signals (terminate, kill, suspend, resume, process tree), priority, affinity, process report, run a program, service start/stop/restart/enable/disable, startup apps, lock or sign off sessions, uninstall, disk scan, benchmarks, Flight Recorder, system info export, clearing histories, settings and page changes. Each action is shown in the status bar.
+- `--mcp-http[=PORT]` (MCP over HTTP without the UI) and `--mcp` (MCP over stdin/stdout, for clients that start RustyTM themselves).
+
+### Fixed
+- Services and Users pages: start, stop, restart, enable, disable, lock and sign off no longer freeze the screen while systemctl, loginctl or the pkexec password dialog runs. The status bar shows the action at once and its result when it ends, then the page reloads. These commands are stopped after 120 seconds without an answer. A second action on a service or session that is still being changed is refused, and results that end close together are all shown, failures first.
+
 ## 1.6.0 - 2026-11-19
 
 ### Added

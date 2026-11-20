@@ -34,6 +34,7 @@ Or from source:
     ./target/release/rustytm --self-test
     ./target/release/rustytm --record=30     # headless Flight Recorder -> *.rustytmtrace
     ./target/release/rustytm --bench=cpu|disk|gpu|internet|all
+    ./target/release/rustytm --mcp-http     # MCP server for AI assistants, no UI (see below)
 
 Pages: Summary, Processes (tree, signals, nice, affinity, details, GPU and VRAM columns), Performance (CPU/memory/disks/
 network/GPU, see below), App history, Startup apps, Users, Services, System Info (export; memory and Wi-Fi details), Power & Freq,
@@ -75,6 +76,39 @@ Optional tools: `smartctl` (smartmontools) for Disk Health, `iw` and `nmcli` for
 `dmidecode` for memory modules. SMART and `dmidecode` usually need root (run with `sudo`, or allow
 passwordless `sudo smartctl`/`dmidecode`). Uninstalling supports flatpak, snap, dnf, rpm-ostree,
 apt and rpm, asks for confirmation and escalates with `pkexec` when needed.
+
+## MCP server (AI assistants)
+
+RustyTM can give an AI assistant (any [MCP](https://modelcontextprotocol.io) client: Claude Code,
+Claude Desktop...) access to its data and actions. Turn on **MCP server for AI assistants** on the
+Settings page: the running RustyTM then listens on `http://127.0.0.1:7419/mcp` (Streamable HTTP,
+JSON responses; loopback only, the port is a setting). Every request needs the access token generated
+when the server is first turned on. The Settings page shows the address and the command to add it to
+Claude Code (Enter on "copy the Claude Code setup command" copies it):
+
+    claude mcp add --transport http rustytm http://127.0.0.1:7419/mcp --header "Authorization: Bearer <token>"
+
+Without the UI: `rustytm --mcp-http[=PORT]` serves the same endpoint headless (it prints the command
+above), and `rustytm --mcp` speaks MCP on stdin/stdout for clients that launch the program themselves
+(`claude mcp add rustytm -- rustytm --mcp`).
+
+Read tools (always available): `get_overview`, `get_cpu`, `get_memory`, `get_disks`, `get_network`,
+`get_gpus` (with per-process GPU use), `get_history`, `list_processes` (filter, sort, limit),
+`get_process` (full details), `get_sensors`, `get_batteries`, `get_connections`, `get_kernel_modules`,
+`get_installed_apps`, `get_disk_health`, `get_startup_apps`, `get_services`, `get_users`,
+`get_system_info`, `get_app_history`, `get_disk_scan`, `get_benchmarks`, `get_recorder`, `get_trace`,
+`get_settings`. Data collected in the background (services, connections...) is gathered on demand.
+
+Action tools, only listed when **MCP server: allow actions** is on (off by default):
+`signal_process` (terminate, kill, stop, continue, any signal, optionally the whole tree),
+`set_process_priority`, `set_process_affinity`, `write_process_report`, `run_program`,
+`service_action` (start, stop, restart, enable, disable), `set_startup_app_enabled`, `lock_session`,
+`terminate_session`, `uninstall_app`, `start_disk_scan`, `pause_disk_scan`, `stop_disk_scan`,
+`start_benchmark`, `cancel_benchmark`, `clear_benchmark_history`, `start_recording`,
+`stop_recording`, `save_recording`, `discard_recording`, `export_system_info`, `clear_app_history`,
+`change_setting` (not the MCP settings), `show_page`. They act at once, without the confirmation the
+UI asks for, and run with your rights; each one is announced in the status bar. "New access token"
+on the Settings page revokes the clients set up so far.
 
 Not implemented: video (WebM) recording, tray gadgets / pop-out / screensaver /
 global shortcut (these need a GUI toolkit), localisation.

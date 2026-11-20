@@ -1582,13 +1582,33 @@ fn settings(f: &mut Frame, area: Rect, a: &mut App) {
         format!("{} ms", s.refresh_ms),
         onoff(s.light_theme),
         onoff(s.confirm_stop_scan),
+        match (s.mcp_enabled, a.mcp.is_some(), &a.mcp_error) {
+            (false, _, _) => "Off".into(),
+            (true, true, _) => "On".into(),
+            (true, false, Some(_)) => "Error".into(),
+            (true, false, None) => "Starting".into(),
+        },
+        if s.mcp_allow_actions { "On".into() } else { "Off (read-only)".into() },
+        s.mcp_port.to_string(),
+        String::new(),
+        String::new(),
         String::new(),
     ];
     let rows: Vec<Vec<String>> = SETTINGS_ITEMS.iter().zip(vals).map(|(n, v)| vec![n.to_string(), v]).collect();
+    let parts = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(5), Constraint::Length(5)]).split(area);
     let mut off = a.offset[P_SETTINGS];
     let hint = format!("settings file: {}", crate::settings::path().display());
-    table(f, area, format!("Settings — {hint}"), &["Setting", "Value"], &[Constraint::Min(40), Constraint::Length(16)], rows, a.sel[P_SETTINGS], &mut off, a);
+    table(f, parts[0], format!("Settings — {hint}"), &["Setting", "Value"], &[Constraint::Min(40), Constraint::Length(16)], rows, a.sel[P_SETTINGS], &mut off, a);
     a.offset[P_SETTINGS] = off;
+    let lines: Vec<Line> = match (&a.mcp, &a.mcp_error) {
+        (Some(h), _) => vec![
+            Line::from(format!("Listening on {} ({}). Clients need the access token.", h.url().unwrap_or_else(|| "stdio".into()), if s.mcp_allow_actions { "actions allowed" } else { "read-only" })),
+            Line::from(Span::styled(h.claude_command().unwrap_or_default(), Style::default().fg(Color::DarkGray))),
+        ],
+        (None, Some(e)) if s.mcp_enabled => vec![Line::from(Span::styled(format!("Not running: {e}"), Style::default().fg(Color::Red))), Line::from("Choose another port, or turn the server off and on again.")],
+        _ => vec![Line::from("Off. Turn it on to let an AI assistant (MCP client) read RustyTM's data; actions are a separate setting.")],
+    };
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }).block(block("MCP server", a)), parts[1]);
 }
 
 fn onoff(b: bool) -> String {

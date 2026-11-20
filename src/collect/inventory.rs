@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 // ───────────────────────────── Connections ─────────────────────────────
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Conn {
     pub proto: &'static str,
     pub state: String,
@@ -127,6 +127,7 @@ fn socket_owners() -> HashMap<u64, Vec<(i32, String)>> {
     m
 }
 
+#[derive(serde::Serialize)]
 pub struct ConnResult {
     pub conns: Vec<Conn>,
     pub warnings: Vec<String>,
@@ -241,7 +242,7 @@ pub fn connections() -> ConnResult {
 
 // ───────────────────────────── Kernel modules ─────────────────────────────
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct Module {
     pub name: String,
     pub size: u64,
@@ -258,6 +259,7 @@ pub struct Module {
     pub loaded: bool,
 }
 
+#[derive(serde::Serialize)]
 pub struct ModuleResult {
     pub modules: Vec<Module>,
     pub kernel_release: String,
@@ -362,7 +364,7 @@ pub fn unload_hint(m: &Module) -> String {
 
 // ───────────────────────────── Installed apps ─────────────────────────────
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct App {
     pub name: String,
     pub version: String,
@@ -558,7 +560,7 @@ pub fn uninstall(argv: &[String]) -> Result<String, String> {
 
 // ───────────────────────────── Startup apps ─────────────────────────────
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Startup {
     pub name: String,
     pub command: String,
@@ -630,7 +632,7 @@ pub fn set_startup_enabled(s: &Startup, enable: bool) -> Result<(), String> {
 
 // ───────────────────────────── Users / sessions ─────────────────────────────
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Session {
     pub id: String,
     pub uid: u32,
@@ -668,20 +670,23 @@ pub fn manage_accounts() -> Result<(), String> {
     Err("No user accounts settings panel is installed.".into())
 }
 
+/// Privileged commands (systemctl, loginctl, pkexec) get this long, then are stopped.
+const CMD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
 fn cmd_result(cmd: &str, args: &[&str], fail: &str) -> Result<(), String> {
-    match std::process::Command::new(cmd).args(args).output() {
+    match output_with_timeout(cmd, args, CMD_TIMEOUT) {
         Ok(o) if o.status.success() => Ok(()),
         Ok(o) => {
             let e = String::from_utf8_lossy(&o.stderr).trim().to_string();
             Err(if e.is_empty() { fail.into() } else { format!("{fail} {e}") })
         }
-        Err(_) => Err(fail.into()),
+        Err(e) => Err(format!("{fail} {e}")),
     }
 }
 
 // ───────────────────────────── Services ─────────────────────────────
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Service {
     pub unit: String,
     pub active: String,

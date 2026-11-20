@@ -8,7 +8,7 @@ use crate::util::{read, run, which};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, serde::Serialize)]
 pub struct GpuProc {
     pub pid: u32,
     pub name: String,
@@ -90,7 +90,7 @@ impl GpuProc {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, serde::Serialize)]
 pub struct GpuProcSnap {
     pub procs: Vec<GpuProc>,
     /// Processes whose open files could not be inspected (other users, no ptrace access).
